@@ -1,0 +1,14 @@
+/* man_resource module styles - ZIN compatible */
+
+/* Load rate bar styles */
+.load-rate-bar { width: 100%; background: #eee; height: 8px; border-radius: 4px; overflow: hidden; margin-top: 4px; }
+.load-rate-fill { height: 100%; border-radius: 4px; }
+.label-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+
+/* Table styles */
+#orgList td, #projectList td { vertical-align: middle !important; }
+
+/* Responsive tweaks */
+@media (max-width: 1200px) {
+    .picker { min-width: 100px; }
+}
