@@ -98,6 +98,12 @@ panel
             div
             (
                 setClass('form-group'),
+                h::label($lang->man_resource->executionCol),
+                div(setClass('picker-box'), picker(set::name('execution'), set::items($executionList), set::value($execution), set::placeholder($lang->all)))
+            ),
+            div
+            (
+                setClass('form-group'),
                 h::label($lang->man_resource->date),
                 div(setClass('date-box'), datePicker(set::name('begin'), set::value($begin))),
                 span($lang->man_resource->to),

@@ -110,6 +110,12 @@ panel
             div
             (
                 setClass('form-group'),
+                h::label($lang->man_resource->executionCol),
+                div(setClass('picker-box'), picker(set::name('execution'), set::items($executionList), set::value($execution), set::placeholder($lang->all)))
+            ),
+            div
+            (
+                setClass('form-group'),
                 h::label($lang->man_resource->user),
                 div(setClass('picker-box'), picker(set::name('users'), set::items($userList), set::value($users), set::multiple(true), set::placeholder($lang->all)))
             ),

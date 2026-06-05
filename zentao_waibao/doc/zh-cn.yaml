@@ -1,0 +1,18 @@
+name: 人员外包标识与工时统计
+code: waibao
+type: extension
+copyright: 2026
+site: https://www.zentao.net
+author: ZenTao
+abstract: 禅道人员外包标识与工时统计插件
+desc: |
+  在人员属性中新增"是否外包"标签，支持在组织维度、项目维度、成员维度
+  分别统计外包人员工时和自有人员工时，提供直观的对比分析。
+install: |
+  后台本地安装
+releases:
+  1.0:
+    zentaoversion: 20.0+,biz10.0+,max5.0+,ipd2.0+
+    charge: free
+    changelog: 初始版本发布，支持外包标识和工时分类统计。
+    date: 2026-06-04

@@ -1,0 +1,12 @@
+{
+    "code": "waibao",
+    "name": "人员外包标识与工时统计",
+    "version": "1.0.0",
+    "zentaoVersion": ">=20.0",
+    "author": "李永杰",
+    "email": "liyongjie@sdses.com",
+    "description": "在人员属性中新增是否外包标签，支持在组织维度、项目维度、成员维度分别统计外包人员工时和自有人员工时",
+    "type": "extension",
+    "depend": [],
+    "incompatible": []
+}

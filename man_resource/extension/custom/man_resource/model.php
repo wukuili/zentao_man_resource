@@ -75,6 +75,45 @@ class man_resourceModel extends model
         return $out;
     }
 
+    /**
+     * Get IDs of closed projects and executions.
+     * Tasks belonging to closed projects or closed executions should be
+     * excluded from all statistics calculations.
+     * Uses static cache to avoid repeated queries within one request.
+     *
+     * @return array array of closed project/execution IDs
+     */
+    public function getClosedProjectIDs()
+    {
+        static $cache = null;
+        if($cache !== null) return $cache;
+
+        $cache = $this->dao->select('id')->from(TABLE_PROJECT)
+            ->where('status')->eq('closed')
+            ->andWhere('deleted')->eq('0')
+            ->fetchPairs('id', 'id');
+
+        return $cache;
+    }
+
+    /**
+     * Get execution (iteration/sprint) pairs for a dropdown filter.
+     * When $projectID is given, only return executions belonging to that project.
+     * When $projectID is 0, return all executions.
+     *
+     * @param  int    $projectID  Filter executions by parent project (0 = all)
+     * @return array  id => name pairs, with a leading '' => '' option
+     */
+    public function getExecutionPairs($projectID = 0)
+    {
+        $query = $this->dao->select('id, name')->from(TABLE_PROJECT)
+            ->where('type')->in('sprint,stage')
+            ->andWhere('deleted')->eq('0');
+        if($projectID > 0) $query->andWhere('project')->eq($projectID);
+        $pairs = $query->orderBy('id_desc')->fetchPairs('id', 'name');
+        return array('' => '') + $pairs;
+    }
+
     public function getTaskTeamMap($taskIDs)
     {
         if(empty($taskIDs)) return array();
@@ -103,7 +142,7 @@ class man_resourceModel extends model
     /**
      * Get org calendar data
      */
-    public function getOrgCalendarData($begin, $end, $status, $depts = '', $roles = '', $users = '', $project = 0, $showHoliday = 0)
+    public function getOrgCalendarData($begin, $end, $status, $depts = '', $roles = '', $users = '', $project = 0, $showHoliday = 0, $execution = 0)
     {
         $deptList = !empty($depts) ? explode(',', (string)$depts) : array();
         $roleList = !empty($roles) ? explode(',', (string)$roles) : array();
@@ -126,7 +165,7 @@ class man_resourceModel extends model
         $data = array();
         foreach($usersFound as $account => $user)
         {
-            $data[$account] = $this->getUserLoadRate($account, $begin, $end, $status, $showHoliday, $project);
+            $data[$account] = $this->getUserLoadRate($account, $begin, $end, $status, $showHoliday, $project, $execution);
             $data[$account]['realname'] = $user->realname;
         }
 
@@ -141,7 +180,7 @@ class man_resourceModel extends model
     /**
      * Get project calendar data
      */
-    public function getProjectCalendarData($projectID, $begin, $end, $status, $users = '', $showHoliday = 0)
+    public function getProjectCalendarData($projectID, $begin, $end, $status, $users = '', $showHoliday = 0, $execution = 0)
     {
         $teamMembers = $this->dao->select('account')->from(TABLE_TEAM)
             ->where('root')->eq($projectID)
@@ -153,7 +192,7 @@ class man_resourceModel extends model
         $data = array();
         foreach($teamMembers as $account => $member)
         {
-            $data[$account] = $this->getUserLoadRate($account, $begin, $end, $status, $showHoliday, $projectID);
+            $data[$account] = $this->getUserLoadRate($account, $begin, $end, $status, $showHoliday, $projectID, $execution);
             $data[$account]['realname'] = zget($userPairs, $account, $account);
         }
 
@@ -168,15 +207,15 @@ class man_resourceModel extends model
     /**
      * Get user calendar data
      */
-    public function getUserCalendarData($userID, $begin, $end, $status, $showHoliday = 0)
+    public function getUserCalendarData($userID, $begin, $end, $status, $showHoliday = 0, $execution = 0)
     {
-        return $this->getUserLoadRate($userID, $begin, $end, $status, $showHoliday);
+        return $this->getUserLoadRate($userID, $begin, $end, $status, $showHoliday, 0, $execution);
     }
-    
+
     /**
      * Calculate user load rate over a period
      */
-    public function getUserLoadRate($userID, $begin, $end, $status, $showHoliday = 0, $projectID = 0)
+    public function getUserLoadRate($userID, $begin, $end, $status, $showHoliday = 0, $projectID = 0, $execution = 0)
     {
         $stdHours = $this->config->man_resource->workHoursPerDay;
 
@@ -212,9 +251,13 @@ class man_resourceModel extends model
         }
         if($workDays == 0) $workDays = 1;
 
+        $closedIDs = $this->getClosedProjectIDs();
         $tasks = $this->dao->select('*')->from(TABLE_TASK)
             ->where('assignedTo')->eq($userID)
             ->andWhere('deleted')->eq('0')
+            ->beginIF($execution > 0)->andWhere('execution')->eq($execution)->fi()
+            ->beginIF($execution <= 0 && !empty($closedIDs))->andWhere('execution')->notIN($closedIDs)->fi()
+            ->beginIF(!empty($closedIDs))->andWhere('project')->notIN($closedIDs)->fi()
             ->beginIF($begin)->andWhere("(deadline >= '$begin' OR deadline = '0000-00-00' OR deadline IS NULL OR deadline = '')")->fi()
             ->beginIF($end)->andWhere("(estStarted <= '$end' OR estStarted = '0000-00-00' OR estStarted IS NULL OR estStarted = '')")->fi()
             ->fetchAll('id');
@@ -232,6 +275,9 @@ class man_resourceModel extends model
             $extraTasks = $this->dao->select('*')->from(TABLE_TASK)
                 ->where('id')->in($additionalIDs)
                 ->andWhere('deleted')->eq('0')
+                ->beginIF($execution > 0)->andWhere('execution')->eq($execution)->fi()
+                ->beginIF($execution <= 0 && !empty($closedIDs))->andWhere('execution')->notIN($closedIDs)->fi()
+                ->beginIF(!empty($closedIDs))->andWhere('project')->notIN($closedIDs)->fi()
                 ->fetchAll('id');
             $tasks = $tasks + $extraTasks;
         }
@@ -370,7 +416,7 @@ class man_resourceModel extends model
      *
      * todo mode spreads task->estimate, done mode spreads task->consumed.
      */
-    public function getDailyLoadSeries($accounts, $begin, $end, $status)
+    public function getDailyLoadSeries($accounts, $begin, $end, $status, $execution = 0)
     {
         if(!is_array($accounts)) $accounts = array();
         $stdHours = (float)(isset($this->config->man_resource->workHoursPerDay) ? $this->config->man_resource->workHoursPerDay : 8);
@@ -390,10 +436,14 @@ class man_resourceModel extends model
         }
         if(empty($accounts) || empty($dates)) return array('dates' => $dates, 'series' => $series, 'overall' => array());
 
+        $closedIDs = $this->getClosedProjectIDs();
         $tasks = $this->dao->select('id, assignedTo, estimate, consumed, status, estStarted, deadline, finishedDate, mode')
             ->from(TABLE_TASK)
             ->where('deleted')->eq('0')
             ->andWhere('assignedTo')->in($accounts)
+            ->beginIF($execution > 0)->andWhere('execution')->eq($execution)->fi()
+            ->beginIF($execution <= 0 && !empty($closedIDs))->andWhere('execution')->notIN($closedIDs)->fi()
+            ->beginIF(!empty($closedIDs))->andWhere('project')->notIN($closedIDs)->fi()
             ->beginIF($status == 'todo')->andWhere('status')->notIN('done,closed,cancel')->fi()
             ->beginIF($status == 'done')->andWhere('status')->in('done,closed')->fi()
             ->beginIF($begin)->andWhere("(deadline >= '$begin' OR deadline = '0000-00-00' OR deadline IS NULL OR deadline = '')")->fi()
@@ -412,6 +462,9 @@ class man_resourceModel extends model
                 ->from(TABLE_TASK)
                 ->where('id')->in($additionalIDs)
                 ->andWhere('deleted')->eq('0')
+                ->beginIF($execution > 0)->andWhere('execution')->eq($execution)->fi()
+                ->beginIF($execution <= 0 && !empty($closedIDs))->andWhere('execution')->notIN($closedIDs)->fi()
+                ->beginIF(!empty($closedIDs))->andWhere('project')->notIN($closedIDs)->fi()
                 ->beginIF($status == 'todo')->andWhere('status')->notIN('done,closed,cancel')->fi()
                 ->beginIF($status == 'done')->andWhere('status')->in('done,closed')->fi()
                 ->beginIF($begin)->andWhere("(deadline >= '$begin' OR deadline = '0000-00-00' OR deadline IS NULL OR deadline = '')")->fi()
@@ -510,7 +563,7 @@ class man_resourceModel extends model
      *   lanes: array<account, array{realname:string, tasks:array<int, array>}>
      * }
      */
-    public function getProjectGanttData($projectID, $begin, $end, $users = '')
+    public function getProjectGanttData($projectID, $begin, $end, $users = '', $execution = 0)
     {
         $teamMembers = $this->dao->select('account')->from(TABLE_TEAM)
             ->where('root')->eq($projectID)
@@ -521,6 +574,7 @@ class man_resourceModel extends model
 
         $userPairs = $this->loadModel('user')->getPairs('noletter');
 
+        $closedIDs = $this->getClosedProjectIDs();
         $tasks = $this->dao->select('t1.id, t1.name, t1.assignedTo, t1.status, t1.estimate, t1.estStarted, t1.deadline, t1.project, t1.execution, t1.mode, t2.name AS projectName, t3.name AS executionName')
             ->from(TABLE_TASK)->alias('t1')
             ->leftJoin(TABLE_PROJECT)->alias('t2')->on('t1.project = t2.id')
@@ -528,6 +582,9 @@ class man_resourceModel extends model
             ->where('t1.deleted')->eq('0')
             ->andWhere('t1.assignedTo')->in($teamMembers)
             ->andWhere('t1.status')->notIN('cancel,closed')
+            ->beginIF($execution > 0)->andWhere('t1.execution')->eq($execution)->fi()
+            ->beginIF($execution <= 0 && !empty($closedIDs))->andWhere('t1.execution')->notIN($closedIDs)->fi()
+            ->beginIF(!empty($closedIDs))->andWhere('t1.project')->notIN($closedIDs)->fi()
             ->andWhere('t1.estStarted')->ne('')
             ->andWhere('t1.estStarted')->ne('0000-00-00')
             ->andWhere('t1.deadline')->ne('')
@@ -552,6 +609,9 @@ class man_resourceModel extends model
                 ->where('t1.id')->in($additionalIDs)
                 ->andWhere('t1.deleted')->eq('0')
                 ->andWhere('t1.status')->notIN('cancel,closed')
+                ->beginIF($execution > 0)->andWhere('t1.execution')->eq($execution)->fi()
+                ->beginIF($execution <= 0 && !empty($closedIDs))->andWhere('t1.execution')->notIN($closedIDs)->fi()
+                ->beginIF(!empty($closedIDs))->andWhere('t1.project')->notIN($closedIDs)->fi()
                 ->andWhere('t1.estStarted')->ne('')
                 ->andWhere('t1.estStarted')->ne('0000-00-00')
                 ->andWhere('t1.deadline')->ne('')
@@ -735,11 +795,13 @@ class man_resourceModel extends model
         }
 
         /* Step 3: remaining hours per project (one query). */
+        $closedIDs = $this->getClosedProjectIDs();
         $taskAgg = $this->dao->select("project, SUM(IF(`left` > 0, `left`, GREATEST(estimate - consumed, 0))) AS remain")
             ->from(TABLE_TASK)
             ->where('deleted')->eq('0')
             ->andWhere('project')->in($projectIDs)
             ->andWhere('status')->notIN('done,closed,cancel')
+            ->beginIF(!empty($closedIDs))->andWhere('execution')->notIN($closedIDs)->fi()
             ->groupBy('project')
             ->fetchPairs('project', 'remain');
 
@@ -816,7 +878,7 @@ class man_resourceModel extends model
      *
      * @return array list of conflict rows sorted by ratio desc.
      */
-    public function getProjectConflicts($projectID, $begin, $end, $users = '', $threshold = 1.0)
+    public function getProjectConflicts($projectID, $begin, $end, $users = '', $threshold = 1.0, $execution = 0)
     {
         $stdHours = (float)(isset($this->config->man_resource->workHoursPerDay) ? $this->config->man_resource->workHoursPerDay : 8);
         if($stdHours <= 0) $stdHours = 8;
@@ -830,11 +892,15 @@ class man_resourceModel extends model
 
         $userPairs = $this->loadModel('user')->getPairs('noletter');
 
+        $closedIDs = $this->getClosedProjectIDs();
         $tasks = $this->dao->select('id, name, assignedTo, estimate, estStarted, deadline, mode')
             ->from(TABLE_TASK)
             ->where('deleted')->eq('0')
             ->andWhere('assignedTo')->in($teamMembers)
             ->andWhere('status')->notIN('done,closed,cancel')
+            ->beginIF($execution > 0)->andWhere('execution')->eq($execution)->fi()
+            ->beginIF($execution <= 0 && !empty($closedIDs))->andWhere('execution')->notIN($closedIDs)->fi()
+            ->beginIF(!empty($closedIDs))->andWhere('project')->notIN($closedIDs)->fi()
             ->beginIF($begin)->andWhere("(deadline >= '$begin' OR deadline = '0000-00-00' OR deadline IS NULL OR deadline = '')")->fi()
             ->beginIF($end)->andWhere("(estStarted <= '$end' OR estStarted = '0000-00-00' OR estStarted IS NULL OR estStarted = '')")->fi()
             ->fetchAll('id');
@@ -852,6 +918,9 @@ class man_resourceModel extends model
                 ->where('id')->in($additionalIDs)
                 ->andWhere('deleted')->eq('0')
                 ->andWhere('status')->notIN('done,closed,cancel')
+                ->beginIF($execution > 0)->andWhere('execution')->eq($execution)->fi()
+                ->beginIF($execution <= 0 && !empty($closedIDs))->andWhere('execution')->notIN($closedIDs)->fi()
+                ->beginIF(!empty($closedIDs))->andWhere('project')->notIN($closedIDs)->fi()
                 ->beginIF($begin)->andWhere("(deadline >= '$begin' OR deadline = '0000-00-00' OR deadline IS NULL OR deadline = '')")->fi()
                 ->beginIF($end)->andWhere("(estStarted <= '$end' OR estStarted = '0000-00-00' OR estStarted IS NULL OR estStarted = '')")->fi()
                 ->fetchAll('id');
@@ -986,14 +1055,18 @@ class man_resourceModel extends model
      *   todo: status NOT IN (done, closed, cancel)
      *   done: status IN (done, closed)
      */
-    public function getUserTasks($userID, $begin, $end, $status)
+    public function getUserTasks($userID, $begin, $end, $status, $execution = 0)
     {
+        $closedIDs = $this->getClosedProjectIDs();
         $tasks = $this->dao->select('t1.id, t1.name, t1.status, t1.estimate, t1.consumed, t1.left, t1.deadline, t1.estStarted, t1.project, t1.execution, t1.assignedTo, t1.mode, t2.name AS projectName, t3.name AS executionName')
             ->from(TABLE_TASK)->alias('t1')
             ->leftJoin(TABLE_PROJECT)->alias('t2')->on('t1.project = t2.id')
             ->leftJoin(TABLE_PROJECT)->alias('t3')->on('t1.execution = t3.id')
             ->where('t1.assignedTo')->eq($userID)
             ->andWhere('t1.deleted')->eq('0')
+            ->beginIF($execution > 0)->andWhere('t1.execution')->eq($execution)->fi()
+            ->beginIF($execution <= 0 && !empty($closedIDs))->andWhere('t1.execution')->notIN($closedIDs)->fi()
+            ->beginIF(!empty($closedIDs))->andWhere('t1.project')->notIN($closedIDs)->fi()
             ->beginIF($begin)->andWhere("(t1.deadline >= '$begin' OR t1.deadline = '0000-00-00' OR t1.deadline IS NULL OR t1.deadline = '')")->fi()
             ->beginIF($end)->andWhere("(t1.estStarted <= '$end' OR t1.estStarted = '0000-00-00' OR t1.estStarted IS NULL OR t1.estStarted = '')")->fi()
             ->beginIF($status == 'todo')->andWhere('t1.status')->notIN('done,closed,cancel')->fi()
@@ -1015,6 +1088,9 @@ class man_resourceModel extends model
                 ->leftJoin(TABLE_PROJECT)->alias('t3')->on('t1.execution = t3.id')
                 ->where('t1.id')->in($additionalIDs)
                 ->andWhere('t1.deleted')->eq('0')
+                ->beginIF($execution > 0)->andWhere('t1.execution')->eq($execution)->fi()
+                ->beginIF($execution <= 0 && !empty($closedIDs))->andWhere('t1.execution')->notIN($closedIDs)->fi()
+                ->beginIF(!empty($closedIDs))->andWhere('t1.project')->notIN($closedIDs)->fi()
                 ->beginIF($status == 'todo')->andWhere('t1.status')->notIN('done,closed,cancel')->fi()
                 ->beginIF($status == 'done')->andWhere('t1.status')->in('done,closed')->fi()
                 ->orderBy('t1.deadline_asc, t1.id_desc')
@@ -1170,12 +1246,15 @@ class man_resourceModel extends model
                 ->fetchPairs('account', 'account');
         }
 
+        $closedIDs = $this->getClosedProjectIDs();
         $taskQuery = $this->dao->select('id, name, assignedTo, estimate, estStarted, deadline, mode')
             ->from(TABLE_TASK)
             ->where('deleted')->eq('0')
             ->andWhere('status')->notIN('done,closed,cancel')
             ->beginIF($projectID > 0)->andWhere('project')->eq($projectID)->fi()
-            ->beginIF(!empty($teamMembers))->andWhere('assignedTo')->in($teamMembers)->fi();
+            ->beginIF(!empty($teamMembers))->andWhere('assignedTo')->in($teamMembers)->fi()
+            ->beginIF(!empty($closedIDs))->andWhere('project')->notIN($closedIDs)->fi()
+            ->beginIF(!empty($closedIDs))->andWhere('execution')->notIN($closedIDs)->fi();
         $tasks = $taskQuery->fetchAll('id');
 
         /* Make sure adjustment-only tasks (e.g. a task outside the project window) are still applied. */
@@ -1187,6 +1266,8 @@ class man_resourceModel extends model
                 ->from(TABLE_TASK)
                 ->where('deleted')->eq('0')
                 ->andWhere('id')->in($missingIds)
+                ->beginIF(!empty($closedIDs))->andWhere('project')->notIN($closedIDs)->fi()
+                ->beginIF(!empty($closedIDs))->andWhere('execution')->notIN($closedIDs)->fi()
                 ->fetchAll('id');
             foreach($extraTasks as $tid => $task) $tasks[$tid] = $task;
         }
@@ -1206,6 +1287,8 @@ class man_resourceModel extends model
                     ->where('id')->in($teamAdditionalIDs)
                     ->andWhere('deleted')->eq('0')
                     ->andWhere('status')->notIN('done,closed,cancel')
+                    ->beginIF(!empty($closedIDs))->andWhere('project')->notIN($closedIDs)->fi()
+                    ->beginIF(!empty($closedIDs))->andWhere('execution')->notIN($closedIDs)->fi()
                     ->fetchAll('id');
                 foreach($teamExtraTasks as $tid => $task) $tasks[$tid] = $task;
             }

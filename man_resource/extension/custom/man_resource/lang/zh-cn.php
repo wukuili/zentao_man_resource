@@ -63,6 +63,7 @@ $lang->man_resource->estimatedHoursCol      = '预计剩余(h)';
 $lang->man_resource->estimateHoursPerDay    = '每日平均预计工时';
 $lang->man_resource->status                 = '状态';
 $lang->man_resource->projectCol             = '项目';
+$lang->man_resource->executionCol            = '迭代';
 $lang->man_resource->deadlineCol            = '截止时间';
 $lang->man_resource->company                = '组织资源日历';
 $lang->man_resource->exportCompany          = '导出组织资源日历';

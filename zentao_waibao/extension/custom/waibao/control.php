@@ -1,0 +1,344 @@
+<?php
+/**
+ * 外包标识插件 — 控制器
+ *
+ * 处理所有 HTTP 请求，包括人员标识管理、三个维度的工时统计页面。
+ * 日期参数使用下划线分隔（如 2026_05_28），与禅道路由兼容。
+ */
+class waibao extends control
+{
+    /**
+     * 默认跳转到人员标识管理页
+     */
+    public function browse($dept = 0, $outsourced = '', $orderBy = 'id')
+    {
+        /* POST：筛选表单提交，服务端重定向到带参数的 GET URL */
+        if($this->server->request_method == 'POST')
+        {
+            $dept       = (int)$this->post->dept;
+            $outsourced = $this->post->outsourced;
+            $outsourced = in_array($outsourced, array('', '0', '1')) ? $outsourced : '';
+            $this->locate(inlink('browse', "dept={$dept}&outsourced={$outsourced}"));
+            return;
+        }
+
+        /* GET：正常渲染 */
+        $filterDept       = isset($this->get->dept) ? (int)$this->get->dept : (int)$dept;
+        $filterOutsourced = isset($this->get->outsourced) ? $this->get->outsourced : $outsourced;
+        $filterOutsourced = in_array($filterOutsourced, array('', '0', '1')) ? $filterOutsourced : '';
+
+        $users = $this->waibao->getUserListWithOutsourced($orderBy);
+        $depts = $this->loadModel('dept')->getOptionMenu();
+
+        $this->view->title            = $this->lang->waibao->browse;
+        $this->view->users            = $users;
+        $this->view->depts            = $depts;
+        $this->view->orderBy          = $orderBy;
+        $this->view->filterDept       = $filterDept;
+        $this->view->filterOutsourced = $filterOutsourced;
+
+        $this->display();
+    }
+
+    /**
+     * 设置单个用户的外包标识
+     */
+    public function setUserOutsourced($userID = 0)
+    {
+        if($this->server->request_method == 'POST')
+        {
+            $userID    = (int)$this->post->userID;
+            $outsourced = (int)$this->post->outsourced;
+
+            $result = $this->waibao->updateUserOutsourced($userID, $outsourced);
+            if($result)
+            {
+                return $this->send(array('result' => 'success', 'message' => $this->lang->waibao->setSuccess, 'userID' => $userID));
+            }
+            else
+            {
+                return $this->send(array('result' => 'fail', 'message' => $this->lang->waibao->setFail));
+            }
+        }
+
+        /* GET 请求：显示设置页面 */
+        $user = $this->loadModel('user')->getById($userID);
+        if(!$user) $this->send(array('result' => 'fail', 'message' => '用户不存在'));
+
+        $this->view->title   = $this->lang->waibao->setOutsourced;
+        $this->view->user    = $user;
+        $this->view->outsourcedList = $this->lang->waibao->outsourcedList;
+        $this->display();
+    }
+
+    /**
+     * 批量设置用户外包标识
+     */
+    public function batchSetOutsourced()
+    {
+        if($this->server->request_method == 'POST')
+        {
+            $userIDs    = $this->post->userIDs;
+            $outsourced = (int)$this->post->outsourced;
+            $userIDs    = is_array($userIDs) ? $userIDs : explode(',', (string)$userIDs);
+            $userIDs    = array_values(array_unique(array_filter(array_map('intval', $userIDs))));
+
+            if(empty($userIDs))
+            {
+                return $this->send(array('result' => 'fail', 'message' => '请选择用户'));
+            }
+
+            $result = $this->waibao->batchUpdateOutsourced($userIDs, $outsourced);
+            if($result)
+            {
+                return $this->send(array('result' => 'success', 'message' => $this->lang->waibao->setSuccess));
+            }
+            else
+            {
+                $message = dao::isError() ? dao::getError() : $this->lang->waibao->setFail;
+                return $this->send(array('result' => 'fail', 'message' => $message));
+            }
+        }
+    }
+
+    /**
+     * 组织维度 — 按部门统计外包/自有工时
+     *
+     * @param string $date 日期（用下划线替代横杠）
+     */
+    public function orgdimension($date = '')
+    {
+        /* 处理 POST 筛选 */
+        if($this->server->request_method == 'POST')
+        {
+            $date   = $this->post->date;
+            $dept   = $this->post->dept;
+            $outsourced = $this->post->outsourced;
+            $status = $this->post->status;
+
+            $date = str_replace('_', '-', $date);
+            $this->locate(inlink('orgdimension', "date={$date}&dept={$dept}&outsourced={$outsourced}&status={$status}"));
+        }
+
+        /* 日期参数处理 */
+        $date = str_replace('_', '-', $date);
+        if(empty($date) || $date == '-') $date = date('Y-m-d');
+        $begin = date('Y-m-01', strtotime($date));
+        $end   = date('Y-m-t', strtotime($date));
+
+        /* 获取筛选参数 */
+        $dept       = isset($this->get->dept) ? (int)$this->get->dept : 0;
+        $outsourced = isset($this->get->outsourced) ? $this->get->outsourced : '';
+        $status     = isset($this->get->status) ? $this->get->status : 'todo';
+
+        /* 获取部门列表 */
+        $depts = $this->loadModel('dept')->getOptionMenu();
+
+        /* 获取统计数据 */
+        $data = $this->waibao->getOrgHoursByOutsourced($dept, $begin, $end, $status);
+
+        /* 加载 ECharts */
+        $this->app->loadConfig('waibao');
+
+        $this->view->title       = $this->lang->waibao->orgdimension;
+        $this->view->data        = $data;
+        $this->view->depts       = $depts;
+        $this->view->currentDept = $dept;
+        $this->view->begin       = $begin;
+        $this->view->end         = $end;
+        $this->view->currentOutsourced = $outsourced;
+        $this->view->currentStatus = $status;
+        $this->view->date        = $date;
+        $this->view->loadRangeColors = $this->config->waibao->loadRangeColors;
+
+        $this->display();
+    }
+
+    /**
+     * 项目维度 — 按项目统计外包/自有工时
+     *
+     * @param string $date 日期
+     * @param int    $project 项目ID
+     */
+    public function projectdimension($date = '', $project = 0)
+    {
+        /* 处理 POST 筛选 */
+        if($this->server->request_method == 'POST')
+        {
+            $date    = $this->post->date;
+            $project = (int)$this->post->project;
+            $outsourced = $this->post->outsourced;
+            $status = $this->post->status;
+
+            $date = str_replace('_', '-', $date);
+            $this->locate(inlink('projectdimension', "date={$date}&project={$project}&outsourced={$outsourced}&status={$status}"));
+        }
+
+        /* 日期参数处理 */
+        $date = str_replace('_', '-', $date);
+        if(empty($date) || $date == '-') $date = date('Y-m-d');
+        $begin = date('Y-m-01', strtotime($date));
+        $end   = date('Y-m-t', strtotime($date));
+
+        /* 获取筛选参数 */
+        $outsourced = isset($this->get->outsourced) ? $this->get->outsourced : '';
+        $status     = isset($this->get->status) ? $this->get->status : 'todo';
+
+        /* 获取项目列表 */
+        $projects = $this->loadModel('project')->getList('doing', '0', 'all');
+
+        /* 获取统计数据 */
+        $data = $this->waibao->getProjectHoursByOutsourced($project, $begin, $end, $status);
+
+        $this->app->loadConfig('waibao');
+
+        $this->view->title       = $this->lang->waibao->projectdimension;
+        $this->view->data        = $data;
+        $this->view->projects    = $projects;
+        $this->view->currentProject = $project;
+        $this->view->begin       = $begin;
+        $this->view->end         = $end;
+        $this->view->currentOutsourced = $outsourced;
+        $this->view->currentStatus = $status;
+        $this->view->date        = $date;
+        $this->view->loadRangeColors = $this->config->waibao->loadRangeColors;
+
+        $this->display();
+    }
+
+    /**
+     * 成员维度 — 按成员统计外包/自有工时
+     *
+     * @param string $date 日期
+     * @param string $userID 用户账号
+     */
+    public function memberdimension($date = '', $userID = '')
+    {
+        /* 处理 POST 筛选 */
+        if($this->server->request_method == 'POST')
+        {
+            $date    = $this->post->date;
+            $userID  = $this->post->userID;
+            $outsourced = $this->post->outsourced;
+            $status = $this->post->status;
+
+            $date = str_replace('_', '-', $date);
+            $this->locate(inlink('memberdimension', "date={$date}&userID={$userID}&outsourced={$outsourced}&status={$status}"));
+        }
+
+        /* 日期参数处理 */
+        $date = str_replace('_', '-', $date);
+        if(empty($date) || $date == '-') $date = date('Y-m-d');
+        $begin = date('Y-m-01', strtotime($date));
+        $end   = date('Y-m-t', strtotime($date));
+
+        /* 获取筛选参数 */
+        $outsourced = isset($this->get->outsourced) ? $this->get->outsourced : '';
+        $status     = isset($this->get->status) ? $this->get->status : 'todo';
+
+        /* 获取用户列表 */
+        $users = $this->loadModel('user')->getPairs('nodeleted|noletter|useid');
+
+        /* 获取统计数据 */
+        $data = $this->waibao->getMemberHoursByOutsourced($userID, $begin, $end, $status);
+
+        $this->app->loadConfig('waibao');
+
+        $this->view->title       = $this->lang->waibao->memberdimension;
+        $this->view->data        = $data;
+        $this->view->users       = $users;
+        $this->view->currentUser = $userID;
+        $this->view->begin       = $begin;
+        $this->view->end         = $end;
+        $this->view->currentOutsourced = $outsourced;
+        $this->view->currentStatus = $status;
+        $this->view->date        = $date;
+        $this->view->loadRangeColors = $this->config->waibao->loadRangeColors;
+
+        $this->display();
+    }
+
+    /**
+     * 多维外包工时汇总页（外包工时菜单首页）。
+     *
+     * 顶部筛选：时间范围 / 部门 / 项目 / 迭代；可切换分组维度。
+     * 工时口径以「已消耗」为主，数据源为 zt_effort 工时日志。
+     *
+     * @param string $begin     开始日期（用下划线替代横杠）
+     * @param string $end       结束日期
+     * @param int    $dept      部门ID
+     * @param int    $project   项目ID
+     * @param int    $execution 迭代ID
+     * @param string $groupBy   分组维度 member|project|execution|dept|month
+     */
+    public function summary($begin = '', $end = '', $dept = 0, $project = 0, $execution = 0, $groupBy = 'member')
+    {
+        /* POST：筛选表单提交，重定向到 GET */
+        if($this->server->request_method == 'POST')
+        {
+            $begin     = str_replace('-', '_', $this->post->begin);
+            $end       = str_replace('-', '_', $this->post->end);
+            $dept      = (int)$this->post->dept;
+            $project   = (int)$this->post->project;
+            $execution = (int)$this->post->execution;
+            $groupBy   = $this->post->groupBy;
+            $this->locate(inlink('summary', "begin={$begin}&end={$end}&dept={$dept}&project={$project}&execution={$execution}&groupBy={$groupBy}"));
+            return;
+        }
+
+        /* 日期处理：默认本月 */
+        $begin = str_replace('_', '-', $begin);
+        $end   = str_replace('_', '-', $end);
+        if(empty($begin) || $begin == '-') $begin = date('Y-m-01');
+        if(empty($end)   || $end   == '-') $end   = date('Y-m-t');
+
+        $data = $this->waibao->getOutsourcedSummary($begin, $end, (int)$dept, (int)$project, (int)$execution, $groupBy);
+
+        /* 筛选下拉数据 */
+        $depts      = $this->loadModel('dept')->getOptionMenu();
+        $projects   = $this->waibao->getProjectPairs();
+        $executions = $this->waibao->getExecutionPairs((int)$project);
+
+        $this->app->loadConfig('waibao');
+
+        $this->view->title            = $this->lang->waibao->summary;
+        $this->view->data             = $data;
+        $this->view->depts            = $depts;
+        $this->view->projects         = $projects;
+        $this->view->executions       = $executions;
+        $this->view->begin            = $begin;
+        $this->view->end              = $end;
+        $this->view->currentDept      = (int)$dept;
+        $this->view->currentProject   = (int)$project;
+        $this->view->currentExecution = (int)$execution;
+        $this->view->groupBy          = $data['groupBy'];
+
+        $this->display();
+    }
+
+    /**
+     * 项目级外包工时总览（项目左侧菜单页）。
+     *
+     * 展示当前项目团队内各外包人员的已消耗（主）/预计/剩余工时。
+     *
+     * @param int $projectID 项目ID
+     */
+    public function projectOverview($projectID = 0)
+    {
+        $projectID = (int)$projectID;
+        if($projectID <= 0 && $this->session->project) $projectID = (int)$this->session->project;
+
+        $project = $projectID > 0 ? $this->loadModel('project')->getByID($projectID) : null;
+        if($project) $this->project->setMenu($projectID);
+
+        $data = $this->waibao->getProjectOutsourcedMembers($projectID);
+
+        $this->view->title     = $this->lang->waibao->projectOverview;
+        $this->view->project   = $project;
+        $this->view->projectID = $projectID;
+        $this->view->members   = isset($data['members']) ? $data['members'] : array();
+        $this->view->totalRow  = isset($data['total']) ? $data['total'] : array('consumed' => 0, 'estimated' => 0, 'remain' => 0, 'taskCount' => 0);
+
+        $this->display();
+    }
+}
