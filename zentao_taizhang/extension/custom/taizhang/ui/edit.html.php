@@ -115,5 +115,8 @@ panel
     html($formHTML)
 );
 
-echo '<link rel="stylesheet" href="' . $app->getWebRoot() . 'extension/custom/taizhang/css/taizhang.css">';
-echo '<script src="' . $app->getWebRoot() . 'extension/custom/taizhang/js/taizhang.js"></script>';
+/* extension/ 不在 Web 根下，读取文件内容内联输出，避免静态资源 404/MIME 报错 */
+$cssPath = $app->getAppRoot() . 'extension/custom/taizhang/css/taizhang.css';
+$jsPath  = $app->getAppRoot() . 'extension/custom/taizhang/js/taizhang.js';
+if(is_file($cssPath)) echo "<style>\n"  . file_get_contents($cssPath) . "\n</style>";
+if(is_file($jsPath))  echo "<script>\n" . file_get_contents($jsPath)  . "\n</script>";

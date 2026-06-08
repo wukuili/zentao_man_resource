@@ -70,6 +70,15 @@ class taizhangModel extends model
         $entries = $query->orderBy('t.sortOrder asc, t.id asc')->fetchAll();
 
         $userPairs = $this->loadModel('user')->getPairs('noletter');
+
+        /* 收集关联项目ID，批量取实时数据，避免逐行查询 */
+        $projectIDs = array();
+        foreach($entries as $entry) if($entry->projectID) $projectIDs[$entry->projectID] = $entry->projectID;
+
+        $phaseMap  = $this->getCurrentPhaseMap($projectIDs);
+        $taskMap   = $this->getTaskStatMap($projectIDs);
+        $memberMap = $this->getProjectMemberMap($projectIDs, $userPairs);
+
         foreach($entries as $entry)
         {
             $entry->pmName        = zget($userPairs, $entry->pmAccount, $entry->pmAccount);
@@ -77,9 +86,106 @@ class taizhangModel extends model
             $entry->profitRate    = $this->calcProfitRate((float)$entry->revenue, (float)$entry->currentBudget);
             /* 展示用名称优先取 shortName，否则取项目名 */
             if(empty($entry->shortName) && !empty($entry->projectName)) $entry->shortName = $entry->projectName;
+
+            $pid = (int)$entry->projectID;
+
+            /* 项目阶段：取项目当前执行中的迭代/阶段名（无则保留已存值） */
+            if(isset($phaseMap[$pid])) $entry->phase = $phaseMap[$pid];
+
+            /* 当前项目情况：项目任务汇总（总数 / 已完成 / 未完成） */
+            if(isset($taskMap[$pid]))
+            {
+                $total  = $taskMap[$pid]['total'];
+                $done   = $taskMap[$pid]['done'];
+                $undone = $total - $done;
+                $entry->currentStatus = "总任务 {$total}　已完成 {$done}　未完成 {$undone}";
+            }
+
+            /* 近期项目成员：项目团队成员真实姓名 */
+            if(isset($memberMap[$pid])) $entry->recentMembers = $memberMap[$pid];
         }
 
         return $entries;
+    }
+
+    /**
+     * 批量获取每个项目「当前执行中」的迭代/阶段名。
+     * 同一项目有多个执行中阶段时，取最近开始的一个。
+     *
+     * @param array $projectIDs projectID 列表
+     * @return array projectID => 阶段名
+     */
+    public function getCurrentPhaseMap($projectIDs)
+    {
+        if(empty($projectIDs)) return array();
+
+        /* 注意：begin 是 MySQL 保留字，这里用 id desc 取最近创建的执行中阶段，避免引用保留字列 */
+        $rows = $this->dao->select('id, project, name')->from('zt_project')
+            ->where('project')->in($projectIDs)
+            ->andWhere('type')->in('sprint,stage')
+            ->andWhere('status')->eq('doing')
+            ->andWhere('deleted')->eq('0')
+            ->orderBy('id desc')
+            ->fetchGroup('project');
+
+        $map = array();
+        foreach($rows as $pid => $list) $map[(int)$pid] = $list[0]->name;
+        return $map;
+    }
+
+    /**
+     * 批量获取每个项目的任务统计（总数 / 已完成）。
+     * 总数排除「已取消」任务；已完成 = status in (done, closed)。
+     *
+     * @param array $projectIDs projectID 列表
+     * @return array projectID => ['total'=>int, 'done'=>int]
+     */
+    public function getTaskStatMap($projectIDs)
+    {
+        if(empty($projectIDs)) return array();
+
+        $rows = $this->dao->select('project, status, count(*) as cnt')->from('zt_task')
+            ->where('project')->in($projectIDs)
+            ->andWhere('deleted')->eq('0')
+            ->groupBy('project, status')
+            ->fetchAll();
+
+        $map = array();
+        foreach($rows as $row)
+        {
+            $pid = (int)$row->project;
+            if(!isset($map[$pid])) $map[$pid] = array('total' => 0, 'done' => 0);
+            if($row->status == 'cancel') continue;           // 已取消不计入总数
+            $map[$pid]['total'] += (int)$row->cnt;
+            if($row->status == 'done' || $row->status == 'closed') $map[$pid]['done'] += (int)$row->cnt;
+        }
+        return $map;
+    }
+
+    /**
+     * 批量获取每个项目的团队成员真实姓名（顿号分隔）。
+     *
+     * @param array $projectIDs projectID 列表
+     * @param array $userPairs   account => 真实姓名 映射
+     * @return array projectID => 姓名串
+     */
+    public function getProjectMemberMap($projectIDs, $userPairs)
+    {
+        if(empty($projectIDs)) return array();
+
+        $rows = $this->dao->select('root, account')->from('zt_team')
+            ->where('root')->in($projectIDs)
+            ->andWhere('type')->eq('project')
+            ->fetchGroup('root');
+
+        $map = array();
+        foreach($rows as $root => $list)
+        {
+            $names = array();
+            foreach($list as $r) $names[zget($userPairs, $r->account, $r->account)] = true;
+            $map[(int)$root] = implode('、', array_keys($names));
+        }
+        return $map;
     }
 
     /**

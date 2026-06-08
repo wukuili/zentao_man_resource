@@ -179,8 +179,12 @@ panel
     html($filterHTML . $tableHTML)
 );
 
-/* ── 加载 CSS / JS ── */
+/* ── 内联 CSS / JS ──
+ * extension/ 目录不在禅道 Web 根(www)下，无法作为静态资源直接 URL 访问，
+ * 否则浏览器会拿到 404 的 HTML 页面而报 MIME 类型错误。
+ * 这里服务端读取文件内容内联输出，文件仍是唯一来源。
+ */
 $cssPath = $app->getAppRoot() . 'extension/custom/taizhang/css/taizhang.css';
 $jsPath  = $app->getAppRoot() . 'extension/custom/taizhang/js/taizhang.js';
-echo '<link rel="stylesheet" href="' . $app->getWebRoot() . 'extension/custom/taizhang/css/taizhang.css">';
-echo '<script src="' . $app->getWebRoot() . 'extension/custom/taizhang/js/taizhang.js"></script>';
+if(is_file($cssPath)) echo "<style>\n"  . file_get_contents($cssPath) . "\n</style>";
+if(is_file($jsPath))  echo "<script>\n" . file_get_contents($jsPath)  . "\n</script>";
