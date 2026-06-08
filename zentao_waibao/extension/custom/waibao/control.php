@@ -30,11 +30,20 @@ class waibao extends control
         $users = $this->waibao->getUserListWithOutsourced($orderBy);
         $depts = $this->loadModel('dept')->getOptionMenu();
 
+        /* 计算当前部门及所有子部门 ID，用于模板中的精准筛选 */
+        $filterDeptIDs = array();
+        if($filterDept > 0)
+        {
+            $childIDs      = $this->loadModel('dept')->getAllChildId($filterDept);
+            $filterDeptIDs = array_merge(array($filterDept), (array)$childIDs);
+        }
+
         $this->view->title            = $this->lang->waibao->browse;
         $this->view->users            = $users;
         $this->view->depts            = $depts;
         $this->view->orderBy          = $orderBy;
         $this->view->filterDept       = $filterDept;
+        $this->view->filterDeptIDs    = $filterDeptIDs;
         $this->view->filterOutsourced = $filterOutsourced;
 
         $this->display();
@@ -74,12 +83,13 @@ class waibao extends control
     /**
      * 批量设置用户外包标识
      */
-    public function batchSetOutsourced()
+    public function batchSetOutsourced($outsourced = 0)
     {
         if($this->server->request_method == 'POST')
         {
-            $userIDs    = $this->post->userIDs;
-            $outsourced = (int)$this->post->outsourced;
+            $userIDs = $this->post->userIDs;
+            /* outsourced 优先取 POST（兼容旧的独立页 $.post 调用），否则取路由参数（company 列表页 ZUI data-url 提交） */
+            $outsourced = ($this->post->outsourced !== false && $this->post->outsourced !== null) ? (int)$this->post->outsourced : (int)$outsourced;
             $userIDs    = is_array($userIDs) ? $userIDs : explode(',', (string)$userIDs);
             $userIDs    = array_values(array_unique(array_filter(array_map('intval', $userIDs))));
 
@@ -91,7 +101,9 @@ class waibao extends control
             $result = $this->waibao->batchUpdateOutsourced($userIDs, $outsourced);
             if($result)
             {
-                return $this->send(array('result' => 'success', 'message' => $this->lang->waibao->setSuccess));
+                /* load 让 ZUI（open-url + data-load=post）提交成功后刷新当前用户列表 */
+                $locate = $this->session->userList ? $this->session->userList : helper::createLink('company', 'browse');
+                return $this->send(array('result' => 'success', 'message' => $this->lang->waibao->setSuccess, 'load' => $locate));
             }
             else
             {
@@ -314,6 +326,51 @@ class waibao extends control
         $this->view->groupBy          = $data['groupBy'];
 
         $this->display();
+    }
+
+    /**
+     * 导出外包工时汇总为 CSV（可直接用 Excel 打开）。
+     *
+     * @param string $begin     开始日期
+     * @param string $end       结束日期
+     * @param int    $dept      部门ID
+     * @param int    $project   项目ID
+     * @param int    $execution 迭代ID
+     * @param string $groupBy   分组维度
+     */
+    public function exportSummary($begin = '', $end = '', $dept = 0, $project = 0, $execution = 0, $groupBy = 'member')
+    {
+        $begin   = str_replace('_', '-', $begin);
+        $end     = str_replace('_', '-', $end);
+        if(empty($begin) || $begin == '-') $begin = date('Y-m-01');
+        if(empty($end)   || $end   == '-') $end   = date('Y-m-t');
+
+        $allowed = array('member', 'project', 'execution', 'dept', 'month');
+        if(!in_array($groupBy, $allowed)) $groupBy = 'member';
+
+        $data          = $this->waibao->getOutsourcedSummary($begin, $end, (int)$dept, (int)$project, (int)$execution, $groupBy);
+        $rows          = isset($data['rows']) ? $data['rows'] : array();
+        $totalConsumed = isset($data['total']) ? $data['total'] : 0;
+
+        $this->app->loadConfig('waibao');
+        $firstColTitle = zget($this->lang->waibao->dimensionTitle, $groupBy, $this->lang->waibao->realname);
+
+        $filename = rawurlencode("外包工时汇总_{$begin}_{$end}.csv");
+        header('Content-Type: text/csv; charset=utf-8');
+        header("Content-Disposition: attachment; filename*=UTF-8''{$filename}");
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        header('Pragma: no-cache');
+
+        echo "\xEF\xBB\xBF";
+        $out = fopen('php://output', 'w');
+        fputcsv($out, array($firstColTitle, '已消耗工时(h)', '占比(%)', '记录数'));
+        foreach($rows as $row)
+        {
+            fputcsv($out, array($row['name'], $row['consumed'], $row['percent'], $row['records']));
+        }
+        fputcsv($out, array('合计', $totalConsumed, 100, ''));
+        fclose($out);
+        exit;
     }
 
     /**

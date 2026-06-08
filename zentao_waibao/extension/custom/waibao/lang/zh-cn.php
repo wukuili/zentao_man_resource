@@ -48,6 +48,7 @@ $lang->waibao->records         = '工时记录数';
 $lang->waibao->totalConsumed   = '已消耗合计';
 $lang->waibao->chartTitle      = '外包已消耗工时分布';
 $lang->waibao->search          = '查询';
+$lang->waibao->exportExcel     = '导出Excel';
 
 /* 外包标识 */
 $lang->waibao->outsourced       = '是否外包';

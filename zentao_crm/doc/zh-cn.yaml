@@ -1,0 +1,23 @@
+# 基本信息。
+name: CRM对接
+code: crmsync
+type: extension
+copyright: 神思电子技术股份有限公司 2026
+site: https://www.sdses.com
+author: 李永杰
+abstract: 禅道与CRM(商机/赢单)对接插件
+# 描述和安装文档，可以多行，支持a, p, div, h3-h6, strong, img, table, tr, td, ol, ul, li, span标签。
+desc: |
+  禅道CRM对接插件，用于与外部CRM系统(神思综合管理平台)联通。商机赢单后由CRM回调禅道，自动创建对应的融合瀑布项目，并将商机基础信息(名称、客户、合同金额、合同日期等)同步到禅道；同时对外提供产品列表接口，供CRM端选择"产品衍生项目"或"单纯项目"。支持赢单自动建项目与用户手动建项目，按商机ID幂等防重，并提供同步日志查看与失败重试。
+install: |
+  后台本地安装
+# license: |
+#   本插件遵循ZPL协议授权发布。
+
+# 版本信息。
+releases:
+  1.0:
+    zentaoversion: 20.0+,biz10.0+,max5.0+,ipd2.0+
+    charge: free
+    changelog: 初始版本发布，支持禅道20.0+插件规范；提供赢单回调建项目、产品列表接口、同步日志与重试。
+    date: 2026-06-07

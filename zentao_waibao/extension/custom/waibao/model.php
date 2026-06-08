@@ -138,7 +138,7 @@ class waibaoModel extends model
      * @access public
      * @return array
      */
-    public function getOrgHoursByOutsourced($deptID = 0, $begin, $end, $status = 'todo')
+    public function getOrgHoursByOutsourced($deptID, $begin, $end, $status = 'todo')
     {
         /* 获取部门下的用户（含外包标识） */
         $deptList = array();
@@ -281,7 +281,7 @@ class waibaoModel extends model
      * @access public
      * @return array
      */
-    public function getProjectHoursByOutsourced($projectID = 0, $begin, $end, $status = 'todo')
+    public function getProjectHoursByOutsourced($projectID, $begin, $end, $status = 'todo')
     {
         $closedIDs = $this->getClosedProjectIDs();
 
@@ -426,7 +426,7 @@ class waibaoModel extends model
      * @access public
      * @return array
      */
-    public function getMemberHoursByOutsourced($userID = '', $begin, $end, $status = 'todo')
+    public function getMemberHoursByOutsourced($userID, $begin, $end, $status = 'todo')
     {
         $closedIDs = $this->getClosedProjectIDs();
 

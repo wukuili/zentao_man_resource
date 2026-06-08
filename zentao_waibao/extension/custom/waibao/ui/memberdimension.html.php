@@ -35,7 +35,7 @@ featureBar
         datePicker
         (
             set::name('date'),
-            set::value(str_replace('-', '_', $date))
+            set::value($date)
         ),
         btn
         (

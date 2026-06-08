@@ -35,9 +35,9 @@ featureBar
     (
         setClass('flex items-center flex-wrap gap-2'),
         label($lang->waibao->filterBegin),
-        datePicker(set::name('begin'), set::value(str_replace('-', '_', $begin))),
+        datePicker(set::name('begin'), set::value($begin)),
         label($lang->waibao->filterEnd),
-        datePicker(set::name('end'), set::value(str_replace('-', '_', $end))),
+        datePicker(set::name('end'), set::value($end)),
         label($lang->waibao->filterDept),
         picker(set::name('dept'), set::items($deptList), set::value($currentDept), set::placeholder($lang->waibao->allDept)),
         label($lang->waibao->filterProject),
@@ -46,7 +46,8 @@ featureBar
         picker(set::name('execution'), set::items($execList), set::value($currentExecution), set::placeholder($lang->waibao->allExecution)),
         label($lang->waibao->groupBy),
         picker(set::name('groupBy'), set::items($groupByList), set::value($groupBy)),
-        btn(setClass('btn btn-primary'), set::onClick('submitFilter()'), $lang->waibao->search)
+        btn(setClass('btn btn-primary'), set::onClick('submitFilter()'), $lang->waibao->search),
+        btn(setClass('btn btn-success'), set::onClick('exportData()'), $lang->waibao->exportExcel)
     )
 );
 
@@ -109,10 +110,12 @@ div
 
 /* PHP 端生成 URL 和图表数据 */
 $submitURL   = helper::createLink('waibao', 'summary');
+$exportURL   = helper::createLink('waibao', 'exportSummary');
 $chartNames  = array_column($rows, 'name');
 $chartValues = array_column($rows, 'consumed');
 
 $jsHead = 'var wbSubmitURL='   . json_encode($submitURL)   . ';'
+        . 'var wbExportURL='   . json_encode($exportURL)   . ';'
         . 'var wbChartNames='  . json_encode($chartNames)  . ';'
         . 'var wbChartValues=' . json_encode($chartValues) . ';';
 
@@ -156,6 +159,22 @@ function submitFilter()
     form.innerHTML = html;
     document.body.appendChild(form);
     form.submit();
+}
+function exportData()
+{
+    var begin     = (pickVal('begin') || '').replace(/-/g, '_');
+    var end       = (pickVal('end')   || '').replace(/-/g, '_');
+    var dept      = pickVal('dept')      || '0';
+    var project   = pickVal('project')   || '0';
+    var execution = pickVal('execution') || '0';
+    var groupBy   = pickVal('groupBy')   || 'member';
+    window.location.href = wbExportURL
+        + '?begin='     + begin
+        + '&end='       + end
+        + '&dept='      + dept
+        + '&project='   + project
+        + '&execution=' + execution
+        + '&groupBy='   + groupBy;
 }
 
 loadEcharts(function()

@@ -1,0 +1,75 @@
+<?php
+declare(strict_types=1);
+/**
+ * The settings view file of crmsync module of ZenTaoPMS.
+ */
+namespace zin;
+
+formPanel
+(
+    set::title($lang->crmsync->settingsTitle),
+    formRow
+    (
+        formGroup
+        (
+            set::name('defaultPM'),
+            set::label($lang->crmsync->defaultPM),
+            set::value((string)$defaultPM),
+            set::tip($lang->crmsync->defaultPMTip),
+            set::required(true),
+            set::width('1/2')
+        )
+    ),
+    formRow
+    (
+        formGroup
+        (
+            set::name('defaultProgram'),
+            set::label($lang->crmsync->defaultProgram),
+            set::value((string)$defaultProgram),
+            set::tip($lang->crmsync->defaultProgramTip),
+            set::width('1/2')
+        )
+    ),
+    formRow
+    (
+        formGroup
+        (
+            set::name('defaultProductName'),
+            set::label($lang->crmsync->defaultProductName),
+            set::value((string)$defaultProductName),
+            set::tip($lang->crmsync->defaultProductNameTip),
+            set::width('1/2')
+        )
+    ),
+    formRow
+    (
+        formGroup
+        (
+            set::name('defaultDurationMonths'),
+            set::label($lang->crmsync->defaultDurationMonths),
+            set::value((string)$defaultDurationMonths),
+            set::width('1/2')
+        )
+    ),
+    formRow
+    (
+        formGroup
+        (
+            set::name('apiToken'),
+            set::label($lang->crmsync->apiToken),
+            set::placeholder($lang->crmsync->apiTokenTip),
+            set::width('1/2')
+        )
+    ),
+    formRow
+    (
+        formGroup
+        (
+            set::name('apiTokenOperator'),
+            set::label($lang->crmsync->apiTokenOperator),
+            set::tip($lang->crmsync->apiTokenOperatorTip),
+            set::width('1/2')
+        )
+    )
+);

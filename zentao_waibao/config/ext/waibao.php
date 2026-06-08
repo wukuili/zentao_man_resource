@@ -11,6 +11,7 @@ $config->openMethods[] = 'waibao.browse';
 
 /* 仅需登录即可访问的方法（无需特定权限） */
 $config->logonMethods[] = 'waibao.summary';
+$config->logonMethods[] = 'waibao.exportSummary';
 $config->logonMethods[] = 'waibao.projectOverview';
 $config->logonMethods[] = 'waibao.browse';
 $config->logonMethods[] = 'waibao.orgdimension';
