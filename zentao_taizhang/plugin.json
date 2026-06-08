@@ -1,0 +1,12 @@
+{
+    "code": "taizhang",
+    "name": "项目台账",
+    "version": "1.0.0",
+    "zentaoVersion": ">=20.0",
+    "author": "李永杰",
+    "email": "wukuili@gmail.com",
+    "description": "项目台账管理插件，统计所有项目的预估成本、已投入成本、当前预估利润率等关键指标，支持多维度筛选和超成本预警",
+    "type": "extension",
+    "depend": [],
+    "incompatible": []
+}

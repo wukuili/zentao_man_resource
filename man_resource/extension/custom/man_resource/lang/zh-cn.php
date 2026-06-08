@@ -207,7 +207,10 @@ $lang->man_resource->searchType['month'] = '按月查看';
 $lang->man_resource->setHoursList[1] = '开启';
 $lang->man_resource->setHoursList[0] = '关闭';
 
-$lang->man_resource->taskCountCol = '并行任务数';
+$lang->man_resource->taskCountCol      = '并行任务数';
+$lang->man_resource->bugCountCol       = 'Bug数';
+$lang->man_resource->bugFixDaysCol     = '修复时长(天)';
+$lang->man_resource->bugReopenCountCol = 'Reopen次数';
 $lang->man_resource->invalidLoadRange = '负载区间数值设置不合理（必须满足：轻松 < 有余力 < 正常 < 满载 < 超载）';
 
 $lang->man_resource->openSetpredicthoursTip = '此处可以设置每项工时预测。开启后，系统将自动预测任务或非任务类条目的工时。';

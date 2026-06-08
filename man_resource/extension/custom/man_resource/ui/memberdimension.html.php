@@ -52,10 +52,7 @@ if(common::hasPriv('man_resource', 'exportPerson'))
         set::type('ghost'),
         set::icon('export'),
         set::text($lang->export),
-        set::url(helper::createLink('man_resource', 'exportPerson', "begin=" . strtotime($begin) . "&end=" . strtotime($end) . "&mode={$status}", '', true)),
-        set('data-toggle', 'modal'),
-        set('data-type', 'iframe'),
-        set('data-width', '600px')
+        set::url(helper::createLink('man_resource', 'exportPerson', "begin=" . strtotime($begin) . "&end=" . strtotime($end) . "&mode={$status}&userID={$userID}"))
     );
 }
 
@@ -151,7 +148,10 @@ panel
             array('id' => 3, 'label' => $lang->man_resource->totalEstimatedHoursCol, 'value' => $calendarData['remain_hours']),
             array('id' => 4, 'label' => $lang->man_resource->taskCountCol, 'value' => $calendarData['parallel_tasks']),
             array('id' => 5, 'label' => $lang->man_resource->loadRateCol, 'value' => "<span style='color:{$textColor}'>{$calendarData['load_rate']}%</span><div class='load-rate-bar'><div class='load-rate-fill' style='width:{$loadRate}%;background:{$textColor}'></div></div>"),
-            array('id' => 6, 'label' => $lang->man_resource->status, 'value' => $loadName)
+            array('id' => 6, 'label' => $lang->man_resource->status, 'value' => $loadName),
+            array('id' => 7, 'label' => $lang->man_resource->bugCountCol,       'value' => isset($calendarData['bug_count'])        ? $calendarData['bug_count']        : 0),
+            array('id' => 8, 'label' => $lang->man_resource->bugFixDaysCol,     'value' => isset($calendarData['bug_fix_days'])     ? $calendarData['bug_fix_days']     : 0),
+            array('id' => 9, 'label' => $lang->man_resource->bugReopenCountCol, 'value' => isset($calendarData['bug_reopen_count']) ? $calendarData['bug_reopen_count'] : 0),
         )),
         set::emptyTip($lang->man_resource->browseTip)
     )

@@ -1,0 +1,126 @@
+/* ===== 项目台账插件样式 ===== */
+
+/* 筛选栏 */
+.tz-filter-bar {
+    background: #f0f7ff;
+    border: 1px solid #cce4ff;
+    border-radius: 6px;
+    padding: 10px 16px;
+    margin-bottom: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+.tz-filter-bar label {
+    font-weight: 600;
+    font-size: 13px;
+    white-space: nowrap;
+    color: #333;
+}
+.tz-filter-bar select {
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 13px;
+    min-width: 110px;
+    background: #fff;
+}
+.tz-filter-bar .tz-filter-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+}
+
+/* 台账表格 */
+.tz-table-wrap {
+    overflow-x: auto;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+}
+.tz-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    min-width: 1200px;
+}
+.tz-table thead th {
+    background: #4a9ed7;
+    color: #fff;
+    padding: 9px 10px;
+    text-align: center;
+    white-space: nowrap;
+    border: 1px solid #3a8ec7;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+.tz-table tbody td {
+    padding: 8px 10px;
+    border: 1px solid #e0e0e0;
+    vertical-align: top;
+}
+.tz-table tbody tr:nth-child(even) td {
+    background-color: #f8f9fa;
+}
+.tz-table tbody tr:hover td {
+    background-color: #e8f4fd !important;
+}
+.tz-table .td-center  { text-align: center; }
+.tz-table .td-right   { text-align: right;  }
+.tz-table .td-status  { max-width: 260px; white-space: pre-wrap; word-break: break-word; font-size: 12px; line-height: 1.6; }
+.tz-table .td-members { max-width: 200px; font-size: 12px; color: #555; }
+.tz-table .td-serial  { color: #888; }
+
+/* 数值类 */
+.tz-table .td-num     { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* 告警样式 */
+.tz-warn   { color: #dc3545 !important; font-weight: 700; }        /* 低于警告阈值 */
+.tz-danger { background-color: #dc3545 !important; color: #fff !important; font-weight: 700; } /* 低于危险阈值 */
+.tz-over   { color: #dc3545 !important; font-weight: 700; }        /* 已投入成本超过初始预估 */
+
+/* 合计行 */
+.tz-table tfoot td {
+    background: #e8f0fe;
+    font-weight: 700;
+    border: 1px solid #c5d5f0;
+    padding: 8px 10px;
+}
+.tz-table tfoot .td-right,
+.tz-table tfoot .td-num { text-align: right; }
+
+/* 操作列 */
+.tz-actions { display: flex; gap: 6px; justify-content: center; white-space: nowrap; }
+.tz-actions a { font-size: 12px; }
+
+/* 编辑表单 */
+.tz-form-panel { max-width: 780px; margin: 0 auto; }
+.tz-form-group { margin-bottom: 14px; }
+.tz-form-group label {
+    display: block;
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 4px;
+    color: #333;
+}
+.tz-form-group input[type=text],
+.tz-form-group input[type=number],
+.tz-form-group select,
+.tz-form-group textarea {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 13px;
+    box-sizing: border-box;
+}
+.tz-form-group textarea { resize: vertical; min-height: 100px; }
+.tz-form-row { display: flex; gap: 16px; }
+.tz-form-row .tz-form-group { flex: 1; }
+.tz-form-tip { font-size: 12px; color: #888; margin-top: 3px; }
+.tz-form-actions { margin-top: 20px; display: flex; gap: 10px; }
+
+/* 空状态 */
+.tz-empty { padding: 40px; text-align: center; color: #aaa; font-size: 14px; }

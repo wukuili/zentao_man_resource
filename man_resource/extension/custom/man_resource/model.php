@@ -372,18 +372,66 @@ class man_resourceModel extends model
         /* Calculate load rate based on total available hours in the period */
         $totalAvailableHours = $stdHours * $workDays;
         $loadRate = $totalAvailableHours > 0 ? round(($remain / $totalAvailableHours) * 100, 2) : 0;
-        
+
+        $bugStats = $this->getUserBugStats($userID, $begin, $end);
+
         return array(
-            'userID' => $userID,
-            'estimated_hours' => round($estimated, 1),
-            'consumed_hours'  => round($consumed, 1),
-            'remain_hours'    => round($remain, 1),
-            'load_rate'       => $loadRate,
-            'parallel_tasks'  => $parallelTasks,
-            'load_status'     => $this->getLoadStatus($loadRate)
+            'userID'           => $userID,
+            'estimated_hours'  => round($estimated, 1),
+            'consumed_hours'   => round($consumed, 1),
+            'remain_hours'     => round($remain, 1),
+            'load_rate'        => $loadRate,
+            'parallel_tasks'   => $parallelTasks,
+            'load_status'      => $this->getLoadStatus($loadRate),
+            'bug_count'        => $bugStats['bug_count'],
+            'bug_fix_days'     => $bugStats['bug_fix_days'],
+            'bug_reopen_count' => $bugStats['bug_reopen_count'],
         );
     }
-    
+
+    /**
+     * Bug statistics for a user in a date range.
+     * - bug_count:        bugs assigned to user, opened within [begin, end]
+     * - bug_fix_days:     avg calendar days from open→resolve for bugs resolved by user in range
+     * - bug_reopen_count: total reopen (activatedCount) sum for bugs assigned to user, opened in range
+     */
+    public function getUserBugStats($userID, $begin, $end)
+    {
+        if(!defined('TABLE_BUG')) return array('bug_count' => 0, 'bug_fix_days' => 0, 'bug_reopen_count' => 0);
+
+        $endFull = $end . ' 23:59:59';
+
+        $bugCount = (int)$this->dao->select('COUNT(*) AS c')->from(TABLE_BUG)
+            ->where('assignedTo')->eq($userID)
+            ->andWhere('deleted')->eq('0')
+            ->andWhere('openedDate')->ge($begin)
+            ->andWhere('openedDate')->le($endFull)
+            ->fetch('c');
+
+        $reopenCount = (int)$this->dao->select('COALESCE(SUM(activatedCount), 0) AS c')->from(TABLE_BUG)
+            ->where('assignedTo')->eq($userID)
+            ->andWhere('deleted')->eq('0')
+            ->andWhere('openedDate')->ge($begin)
+            ->andWhere('openedDate')->le($endFull)
+            ->fetch('c');
+
+        $fixDays = 0;
+        $fixRow = $this->dao->select('AVG(DATEDIFF(DATE(resolvedDate), DATE(openedDate))) AS avg_d')->from(TABLE_BUG)
+            ->where('resolvedBy')->eq($userID)
+            ->andWhere('deleted')->eq('0')
+            ->andWhere('resolvedDate')->ge($begin)
+            ->andWhere('resolvedDate')->le($endFull)
+            ->andWhere('resolution')->ne('')
+            ->fetch();
+        if($fixRow && $fixRow->avg_d !== null) $fixDays = round((float)$fixRow->avg_d, 1);
+
+        return array(
+            'bug_count'        => $bugCount,
+            'bug_fix_days'     => $fixDays,
+            'bug_reopen_count' => $reopenCount,
+        );
+    }
+
     /**
      * Determine load status string based on configured ranges
      */

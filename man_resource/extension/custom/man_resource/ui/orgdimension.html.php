@@ -58,10 +58,7 @@ if($app->rawMethod == 'orgdimension' && common::hasPriv('man_resource', 'exportC
         set::type('ghost'),
         set::icon('export'),
         set::text($lang->export),
-        set::url(helper::createLink('man_resource', 'exportCompany', "begin=" . strtotime($begin) . "&end=" . strtotime($end) . "&mode={$status}", '', true)),
-        set('data-toggle', 'modal'),
-        set('data-type', 'iframe'),
-        set('data-width', '600px'),
+        set::url(helper::createLink('man_resource', 'exportCompany', "begin=" . strtotime($begin) . "&end=" . strtotime($end) . "&mode={$status}")),
         setID('exportCompanyBtn')
     );
 }
@@ -182,6 +179,9 @@ if(!empty($calendarData))
         $row->parallel_tasks   = $data['parallel_tasks'];
         $row->load_rate        = "<span style='color:{$textColor}'>{$data['load_rate']}%</span><div class='load-rate-bar'><div class='load-rate-fill' style='width:{$loadRate}%;background:{$textColor}'></div></div>";
         $row->status           = $loadName;
+        $row->bug_count        = isset($data['bug_count'])        ? $data['bug_count']        : 0;
+        $row->bug_fix_days     = isset($data['bug_fix_days'])     ? $data['bug_fix_days']     : 0;
+        $row->bug_reopen_count = isset($data['bug_reopen_count']) ? $data['bug_reopen_count'] : 0;
         $tableData[] = $row;
     }
 }
@@ -191,13 +191,16 @@ dtable
     setID('orgList'),
     set::cols(array
     (
-        array('name' => 'realname', 'title' => $lang->man_resource->user, 'width' => '150px', 'sortType' => true, 'html' => true),
-        array('name' => 'estimated_hours', 'title' => $lang->man_resource->estimatedHoursCol, 'width' => '100px', 'sortType' => true),
-        array('name' => 'consumed_hours', 'title' => $lang->man_resource->consumeHoursCol, 'width' => '100px', 'sortType' => true),
-        array('name' => 'remain_hours', 'title' => $lang->man_resource->totalEstimatedHoursCol, 'width' => '100px', 'sortType' => true),
-        array('name' => 'parallel_tasks', 'title' => $lang->man_resource->taskCountCol, 'width' => '100px', 'sortType' => true),
-        array('name' => 'load_rate', 'title' => $lang->man_resource->loadRateCol, 'width' => '100px', 'html' => true),
-        array('name' => 'status', 'title' => $lang->man_resource->status, 'width' => '100px')
+        array('name' => 'realname',         'title' => $lang->man_resource->user,                  'width' => '150px', 'sortType' => true, 'html' => true),
+        array('name' => 'estimated_hours',  'title' => $lang->man_resource->estimatedHoursCol,      'width' => '100px', 'sortType' => true),
+        array('name' => 'consumed_hours',   'title' => $lang->man_resource->consumeHoursCol,        'width' => '100px', 'sortType' => true),
+        array('name' => 'remain_hours',     'title' => $lang->man_resource->totalEstimatedHoursCol, 'width' => '100px', 'sortType' => true),
+        array('name' => 'parallel_tasks',   'title' => $lang->man_resource->taskCountCol,           'width' => '100px', 'sortType' => true),
+        array('name' => 'load_rate',        'title' => $lang->man_resource->loadRateCol,            'width' => '100px', 'html' => true),
+        array('name' => 'status',           'title' => $lang->man_resource->status,                 'width' => '100px'),
+        array('name' => 'bug_count',        'title' => $lang->man_resource->bugCountCol,            'width' => '80px',  'sortType' => true),
+        array('name' => 'bug_fix_days',     'title' => $lang->man_resource->bugFixDaysCol,          'width' => '100px', 'sortType' => true),
+        array('name' => 'bug_reopen_count', 'title' => $lang->man_resource->bugReopenCountCol,      'width' => '100px', 'sortType' => true)
     )),
     set::data($tableData),
     set::footPager(usePager()),

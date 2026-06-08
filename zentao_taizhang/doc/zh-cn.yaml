@@ -1,0 +1,21 @@
+# 基本信息。
+name: 项目台账
+code: taizhang
+type: extension
+copyright: 神思电子技术股份有限公司 2026
+site: https://www.sdses.com
+author: 李永杰
+abstract: 禅道项目台账管理插件
+# 描述和安装文档
+desc: |
+  禅道项目台账插件，统计所有项目的初始预估成本、已投入成本、当前预估成本及利润率等关键指标，支持按项目阶段、项目经理、研发经理筛选，超成本自动红色高亮告警，一屏掌握全部项目健康度。
+install: |
+  后台本地安装
+
+# 版本信息。
+releases:
+  1.0:
+    zentaoversion: 20.0+,biz10.0+,max5.0+,ipd2.0+
+    charge: free
+    changelog: 初始版本发布，支持项目台账增删改查、成本预警、利润率统计。
+    date: 2026-06-08

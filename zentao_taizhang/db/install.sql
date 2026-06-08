@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS `zt_taizhang` (
+  `id`              int(11)        NOT NULL AUTO_INCREMENT,
+  `projectID`       int(11)        NOT NULL DEFAULT 0          COMMENT '关联禅道项目ID，0表示未关联',
+  `shortName`       varchar(100)   NOT NULL DEFAULT ''         COMMENT '项目简称',
+  `phase`           varchar(30)    NOT NULL DEFAULT ''         COMMENT '项目阶段',
+  `rdManager`       varchar(30)    NOT NULL DEFAULT ''         COMMENT '研发经理账号',
+  `currentStatus`   text                                       COMMENT '当前项目情况',
+  `initEstHours`    decimal(10,2)  NOT NULL DEFAULT '0.00'     COMMENT '初始预估人月',
+  `initBudget`      decimal(10,2)  NOT NULL DEFAULT '0.00'     COMMENT '初始预估成本(万元)',
+  `investedHours`   decimal(10,2)  NOT NULL DEFAULT '0.00'     COMMENT '已投入人月',
+  `investedCost`    decimal(10,2)  NOT NULL DEFAULT '0.00'     COMMENT '已投入成本(除外购和税)(万元)',
+  `currentEstHours` decimal(10,2)  NOT NULL DEFAULT '0.00'     COMMENT '当前预估人月',
+  `currentBudget`   decimal(10,2)  NOT NULL DEFAULT '0.00'     COMMENT '当前预估成本(万元)',
+  `revenue`         decimal(10,2)  NOT NULL DEFAULT '0.00'     COMMENT '合同金额/收入(万元)',
+  `recentMembers`   varchar(500)   NOT NULL DEFAULT ''         COMMENT '近期项目成员(逗号分隔的真实姓名)',
+  `sortOrder`       int(11)        NOT NULL DEFAULT 0          COMMENT '显示顺序',
+  `deleted`         tinyint(1)     NOT NULL DEFAULT 0,
+  `createdAt`       datetime       DEFAULT NULL,
+  `updatedAt`       datetime       DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_projectID` (`projectID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='项目台账';

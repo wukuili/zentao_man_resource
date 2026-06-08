@@ -463,124 +463,138 @@ class man_resource extends control
     }
 
     /**
-     * 导出组织资源日历
+     * 导出组织资源日历（直接输出 CSV）
      */
     public function exportCompany($begin, $end, $mode)
     {
-        $begin = (int)$begin;
-        $end   = (int)$end;
-        if($begin <= 0 || $end <= 0) return;
+        $beginTs = (int)$begin;
+        $endTs   = (int)$end;
+        if($beginTs <= 0 || $endTs <= 0) return;
+        $beginDate = date('Y-m-d', $beginTs);
+        $endDate   = date('Y-m-d', $endTs);
 
-        if($_POST)
+        $calendarData = $this->man_resource->getOrgCalendarData($beginDate, $endDate, $mode);
+
+        $filename = rawurlencode("组织资源日历_{$beginDate}_{$endDate}.csv");
+        header('Content-Type: text/csv; charset=utf-8');
+        header("Content-Disposition: attachment; filename*=UTF-8''{$filename}");
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        header('Pragma: no-cache');
+
+        echo "\xEF\xBB\xBF";
+        $out = fopen('php://output', 'w');
+        fputcsv($out, array(
+            $this->lang->man_resource->user,
+            $this->lang->man_resource->estimatedHoursCol,
+            $this->lang->man_resource->consumeHoursCol,
+            $this->lang->man_resource->totalEstimatedHoursCol,
+            $this->lang->man_resource->loadRateCol,
+            $this->lang->man_resource->taskCountCol,
+            $this->lang->man_resource->bugCountCol,
+            $this->lang->man_resource->bugFixDaysCol,
+            $this->lang->man_resource->bugReopenCountCol,
+        ));
+        foreach($calendarData as $data)
         {
-            $calendarData = $this->man_resource->getOrgCalendarData(date('Y-m-d', $begin), date('Y-m-d', $end), $mode);
-            $fields = array(
-                'realname'        => $this->lang->man_resource->user,
-                'estimated_hours' => $this->lang->man_resource->estimatedHoursCol,
-                'consumed_hours'  => $this->lang->man_resource->consumeHoursCol,
-                'remain_hours'    => $this->lang->man_resource->totalEstimatedHoursCol,
-                'load_rate'       => $this->lang->man_resource->loadRateCol,
-                'parallel_tasks'  => $this->lang->man_resource->taskCountCol,
-            );
-            
-            $rows = array();
-            foreach($calendarData as $data)
-            {
-                $row = new stdclass();
-                $row->realname        = $data['realname'];
-                $row->estimated_hours = $data['estimated_hours'];
-                $row->consumed_hours  = $data['consumed_hours'];
-                $row->remain_hours    = $data['remain_hours'];
-                $row->load_rate       = $data['load_rate'] . '%';
-                $row->parallel_tasks  = $data['parallel_tasks'];
-                $rows[] = $row;
-            }
-            
-            $this->post->set('fields', $fields);
-            $this->post->set('rows', $rows);
-            $this->post->set('kind', 'man_resource');
-            $this->fetch('file', 'export2' . $this->post->fileType, $_POST);
+            fputcsv($out, array(
+                $data['realname'],
+                $data['estimated_hours'],
+                $data['consumed_hours'],
+                $data['remain_hours'],
+                $data['load_rate'] . '%',
+                $data['parallel_tasks'],
+                isset($data['bug_count'])        ? $data['bug_count']        : 0,
+                isset($data['bug_fix_days'])     ? $data['bug_fix_days']     : 0,
+                isset($data['bug_reopen_count']) ? $data['bug_reopen_count'] : 0,
+            ));
         }
-        
-        $this->view->fileName = $this->lang->man_resource->company;
-        $this->display($this->moduleName, 'export');
+        fclose($out);
+        exit;
     }
 
     /**
-     * 导出个人资源日历
+     * 导出个人资源日历（直接输出 CSV）
      */
     public function exportPerson($begin, $end, $mode)
     {
-        $begin = (int)$begin;
-        $end   = (int)$end;
-        if($begin <= 0 || $end <= 0) return;
+        $beginTs = (int)$begin;
+        $endTs   = (int)$end;
+        if($beginTs <= 0 || $endTs <= 0) return;
+        $beginDate = date('Y-m-d', $beginTs);
+        $endDate   = date('Y-m-d', $endTs);
 
-        if($_POST)
-        {
-            $userID = $this->app->user->account;
-            $data = $this->man_resource->getUserCalendarData($userID, date('Y-m-d', $begin), date('Y-m-d', $end), $mode);
-            
-            $fields = array('label' => '', 'value' => '');
-            $rows = array();
-            
-            $row = new stdclass(); $row->label = $this->lang->man_resource->estimatedHoursCol;    $row->value = $data['estimated_hours']; $rows[] = $row;
-            $row = new stdclass(); $row->label = $this->lang->man_resource->consumeHoursCol;      $row->value = $data['consumed_hours'];  $rows[] = $row;
-            $row = new stdclass(); $row->label = $this->lang->man_resource->totalEstimatedHoursCol; $row->value = $data['remain_hours'];    $rows[] = $row;
-            $row = new stdclass(); $row->label = $this->lang->man_resource->loadRateCol;         $row->value = $data['load_rate'] . '%'; $rows[] = $row;
-            $row = new stdclass(); $row->label = $this->lang->man_resource->taskCountCol;        $row->value = $data['parallel_tasks'];  $rows[] = $row;
+        $userID = isset($this->get->userID) && $this->get->userID ? $this->get->userID : $this->app->user->account;
+        $data   = $this->man_resource->getUserCalendarData($userID, $beginDate, $endDate, $mode);
 
-            $this->post->set('fields', $fields);
-            $this->post->set('rows', $rows);
-            $this->post->set('kind', 'man_resource');
-            $this->fetch('file', 'export2' . $this->post->fileType, $_POST);
-        }
-        
-        $this->view->fileName = $this->lang->man_resource->person;
-        $this->display($this->moduleName, 'export');
+        $filename = rawurlencode("个人资源日历_{$userID}_{$beginDate}_{$endDate}.csv");
+        header('Content-Type: text/csv; charset=utf-8');
+        header("Content-Disposition: attachment; filename*=UTF-8''{$filename}");
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        header('Pragma: no-cache');
+
+        echo "\xEF\xBB\xBF";
+        $out = fopen('php://output', 'w');
+        fputcsv($out, array('项目', '数值'));
+        fputcsv($out, array($this->lang->man_resource->estimatedHoursCol,      $data['estimated_hours']));
+        fputcsv($out, array($this->lang->man_resource->consumeHoursCol,        $data['consumed_hours']));
+        fputcsv($out, array($this->lang->man_resource->totalEstimatedHoursCol, $data['remain_hours']));
+        fputcsv($out, array($this->lang->man_resource->loadRateCol,            $data['load_rate'] . '%'));
+        fputcsv($out, array($this->lang->man_resource->taskCountCol,           $data['parallel_tasks']));
+        fputcsv($out, array($this->lang->man_resource->bugCountCol,            isset($data['bug_count'])        ? $data['bug_count']        : 0));
+        fputcsv($out, array($this->lang->man_resource->bugFixDaysCol,          isset($data['bug_fix_days'])     ? $data['bug_fix_days']     : 0));
+        fputcsv($out, array($this->lang->man_resource->bugReopenCountCol,      isset($data['bug_reopen_count']) ? $data['bug_reopen_count'] : 0));
+        fclose($out);
+        exit;
     }
 
     /**
-     * 导出项目资源日历
+     * 导出项目资源日历（直接输出 CSV）
      */
     public function exportProject($projectID, $begin, $end, $mode)
     {
-        $begin = (int)$begin;
-        $end   = (int)$end;
-        if($begin <= 0 || $end <= 0) return;
+        $beginTs = (int)$begin;
+        $endTs   = (int)$end;
+        if($beginTs <= 0 || $endTs <= 0) return;
+        $beginDate = date('Y-m-d', $beginTs);
+        $endDate   = date('Y-m-d', $endTs);
 
-        if($_POST)
+        $calendarData = $this->man_resource->getProjectCalendarData((int)$projectID, $beginDate, $endDate, $mode);
+
+        $filename = rawurlencode("项目资源日历_{$beginDate}_{$endDate}.csv");
+        header('Content-Type: text/csv; charset=utf-8');
+        header("Content-Disposition: attachment; filename*=UTF-8''{$filename}");
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        header('Pragma: no-cache');
+
+        echo "\xEF\xBB\xBF";
+        $out = fopen('php://output', 'w');
+        fputcsv($out, array(
+            $this->lang->man_resource->user,
+            $this->lang->man_resource->estimatedHoursCol,
+            $this->lang->man_resource->consumeHoursCol,
+            $this->lang->man_resource->totalEstimatedHoursCol,
+            $this->lang->man_resource->loadRateCol,
+            $this->lang->man_resource->taskCountCol,
+            $this->lang->man_resource->bugCountCol,
+            $this->lang->man_resource->bugFixDaysCol,
+            $this->lang->man_resource->bugReopenCountCol,
+        ));
+        foreach($calendarData as $data)
         {
-            $calendarData = $this->man_resource->getProjectCalendarData($projectID, date('Y-m-d', $begin), date('Y-m-d', $end), $mode);
-            $fields = array(
-                'realname'        => $this->lang->man_resource->user,
-                'estimated_hours' => $this->lang->man_resource->estimatedHoursCol,
-                'consumed_hours'  => $this->lang->man_resource->consumeHoursCol,
-                'remain_hours'    => $this->lang->man_resource->totalEstimatedHoursCol,
-                'load_rate'       => $this->lang->man_resource->loadRateCol,
-                'parallel_tasks'  => $this->lang->man_resource->taskCountCol,
-            );
-            
-            $rows = array();
-            foreach($calendarData as $data)
-            {
-                $row = new stdclass();
-                $row->realname        = $data['realname'];
-                $row->estimated_hours = $data['estimated_hours'];
-                $row->consumed_hours  = $data['consumed_hours'];
-                $row->remain_hours    = $data['remain_hours'];
-                $row->load_rate       = $data['load_rate'] . '%';
-                $row->parallel_tasks  = $data['parallel_tasks'];
-                $rows[] = $row;
-            }
-            
-            $this->post->set('fields', $fields);
-            $this->post->set('rows', $rows);
-            $this->post->set('kind', 'man_resource');
-            $this->fetch('file', 'export2' . $this->post->fileType, $_POST);
+            fputcsv($out, array(
+                $data['realname'],
+                $data['estimated_hours'],
+                $data['consumed_hours'],
+                $data['remain_hours'],
+                $data['load_rate'] . '%',
+                $data['parallel_tasks'],
+                isset($data['bug_count'])        ? $data['bug_count']        : 0,
+                isset($data['bug_fix_days'])     ? $data['bug_fix_days']     : 0,
+                isset($data['bug_reopen_count']) ? $data['bug_reopen_count'] : 0,
+            ));
         }
-        
-        $this->view->fileName = $this->lang->man_resource->projectCalendar;
-        $this->display($this->moduleName, 'export');
+        fclose($out);
+        exit;
     }
 
     /**
