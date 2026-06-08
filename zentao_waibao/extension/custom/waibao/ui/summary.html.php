@@ -51,20 +51,15 @@ featureBar
     )
 );
 
-/* ── 合计卡片 ── */
-div
+/* ── 合计卡片（单行横排） ── */
+panel
 (
-    setClass('flex gap-4 mb-4'),
-    panel
+    set::title($lang->waibao->totalConsumed),
+    div
     (
-        setClass('flex-1'),
-        set::title($lang->waibao->totalConsumed),
-        div
-        (
-            setClass('grid grid-cols-2 gap-4 text-center p-2'),
-            div(span(setClass('text-xl font-bold text-orange-600'), $totalConsumed), br(), span(setClass('text-gray-500'), $lang->waibao->consumedHours)),
-            div(span(setClass('text-xl font-bold text-blue-600'), count($rows)), br(), span(setClass('text-gray-500'), zget($groupByList, $groupBy, '')))
-        )
+        setClass('flex items-center gap-8 px-3 py-2 flex-wrap'),
+        div(setClass('flex items-center gap-1'), span(setClass('text-gray-500 text-sm'), $lang->waibao->consumedHours . '：'), span(setClass('font-bold text-orange-600'), $totalConsumed)),
+        div(setClass('flex items-center gap-1'), span(setClass('text-gray-500 text-sm'), zget($groupByList, $groupBy, '') . '：'), span(setClass('font-bold text-blue-600'), count($rows)))
     )
 );
 

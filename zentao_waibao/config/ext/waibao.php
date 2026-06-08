@@ -13,6 +13,7 @@ $config->openMethods[] = 'waibao.browse';
 $config->logonMethods[] = 'waibao.summary';
 $config->logonMethods[] = 'waibao.exportSummary';
 $config->logonMethods[] = 'waibao.projectOverview';
+$config->logonMethods[] = 'waibao.exportProjectOverview';
 $config->logonMethods[] = 'waibao.browse';
 $config->logonMethods[] = 'waibao.orgdimension';
 $config->logonMethods[] = 'waibao.projectdimension';

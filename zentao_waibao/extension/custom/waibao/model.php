@@ -790,14 +790,16 @@ class waibaoModel extends model
     /**
      * 获取某项目团队内外包成员的工时（已消耗为主，预计/剩余为辅）。
      *
-     * 已消耗取自 zt_effort 工时日志（按人按天记录，天然支持团队任务）；
-     * 预计/剩余取自 zt_task 当前快照。
+     * 已消耗取自 zt_effort 工时日志，支持按日期范围过滤；
+     * 预计/剩余取自 zt_task 当前快照（不受日期范围影响）。
      *
-     * @param  int $projectID 项目ID
+     * @param  int    $projectID 项目ID
+     * @param  string $begin     开始日期 Y-m-d（空=不限）
+     * @param  string $end       结束日期 Y-m-d（空=不限）
      * @access public
      * @return array array('members' => array, 'total' => array)
      */
-    public function getProjectOutsourcedMembers($projectID)
+    public function getProjectOutsourcedMembers($projectID, $begin = '', $end = '')
     {
         $projectID = (int)$projectID;
         if($projectID <= 0) return array('members' => array(), 'total' => array('consumed' => 0, 'estimated' => 0, 'remain' => 0, 'taskCount' => 0));
@@ -818,13 +820,15 @@ class waibaoModel extends model
         $closedIDs = $this->getClosedProjectIDs();
         $depts     = $this->loadModel('dept')->getOptionMenu();
 
-        /* 已消耗：zt_effort 按账号汇总 */
+        /* 已消耗：zt_effort 按账号汇总，支持日期范围过滤 */
         $consumedMap = $this->dao->select('account, ROUND(SUM(consumed), 1) AS consumed, COUNT(*) AS records')
             ->from(TABLE_EFFORT)
             ->where('objectType')->eq('task')
             ->andWhere('deleted')->eq('0')
             ->andWhere('project')->eq($projectID)
             ->andWhere('account')->in($accounts)
+            ->beginIF(!empty($begin))->andWhere('date')->ge($begin)->fi()
+            ->beginIF(!empty($end))->andWhere('date')->le($end)->fi()
             ->beginIF($this->config->waibao->excludeClosedProjects && !empty($closedIDs))->andWhere('execution')->notIn($closedIDs)->fi()
             ->groupBy('account')
             ->fetchAll('account');

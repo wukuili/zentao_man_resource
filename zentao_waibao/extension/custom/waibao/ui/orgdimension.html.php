@@ -51,51 +51,32 @@ $internalSummary = isset($summary['internal']) ? $summary['internal'] : array();
 $outsourcedSummary = isset($summary['outsourced']) ? $summary['outsourced'] : array();
 $totalSummary = isset($summary['total']) ? $summary['total'] : array();
 
-div
+panel
 (
-    setClass('flex gap-4 mb-4'),
-    /* 自有人员汇总 */
-    panel
+    div
     (
-        setClass('flex-1'),
-        set::title($lang->waibao->internal),
-        setClass('panel-success'),
-        div
-        (
-            setClass('grid grid-cols-4 gap-4 text-center p-2'),
-            div(span(setClass('text-lg font-bold'), round($internalSummary['estimated'] ?? 0, 1)), br(), span(setClass('text-gray-500'), $lang->waibao->estimatedHours)),
-            div(span(setClass('text-lg font-bold'), round($internalSummary['consumed'] ?? 0, 1)), br(), span(setClass('text-gray-500'), $lang->waibao->consumedHours)),
-            div(span(setClass('text-lg font-bold'), round($internalSummary['remain'] ?? 0, 1)), br(), span(setClass('text-gray-500'), $lang->waibao->remainHours)),
-            div(span(setClass('text-lg font-bold'), ($internalSummary['count'] ?? 0) . '人'), br(), span(setClass('text-gray-500'), $lang->waibao->internalCount))
-        )
-    ),
-    /* 外包人员汇总 */
-    panel
-    (
-        setClass('flex-1'),
-        set::title($lang->waibao->outsourcedLabel),
-        setClass('panel-warning'),
-        div
-        (
-            setClass('grid grid-cols-4 gap-4 text-center p-2'),
-            div(span(setClass('text-lg font-bold'), round($outsourcedSummary['estimated'] ?? 0, 1)), br(), span(setClass('text-gray-500'), $lang->waibao->estimatedHours)),
-            div(span(setClass('text-lg font-bold'), round($outsourcedSummary['consumed'] ?? 0, 1)), br(), span(setClass('text-gray-500'), $lang->waibao->consumedHours)),
-            div(span(setClass('text-lg font-bold'), round($outsourcedSummary['remain'] ?? 0, 1)), br(), span(setClass('text-gray-500'), $lang->waibao->remainHours)),
-            div(span(setClass('text-lg font-bold'), ($outsourcedSummary['count'] ?? 0) . '人'), br(), span(setClass('text-gray-500'), $lang->waibao->outsourcedCount))
-        )
-    ),
-    /* 总计汇总 */
-    panel
-    (
-        setClass('flex-1'),
-        set::title($lang->waibao->totalHours),
-        div
-        (
-            setClass('grid grid-cols-3 gap-4 text-center p-2'),
-            div(span(setClass('text-xl font-bold text-blue-600'), round($totalSummary['estimated'] ?? 0, 1)), br(), span(setClass('text-gray-500'), $lang->waibao->estimatedHours)),
-            div(span(setClass('text-xl font-bold text-green-600'), round($totalSummary['consumed'] ?? 0, 1)), br(), span(setClass('text-gray-500'), $lang->waibao->consumedHours)),
-            div(span(setClass('text-xl font-bold text-orange-600'), round($totalSummary['remain'] ?? 0, 1)), br(), span(setClass('text-gray-500'), $lang->waibao->remainHours))
-        )
+        setClass('flex items-center gap-8 px-3 py-2 flex-wrap'),
+        /* 自有人员 */
+        span(setClass('text-gray-400 text-sm font-medium'), $lang->waibao->internal . '：'),
+        div(setClass('flex items-center gap-1'), span(setClass('text-gray-500 text-sm'), $lang->waibao->estimatedHours . '：'), span(setClass('font-bold'), round($internalSummary['estimated'] ?? 0, 1))),
+        div(setClass('flex items-center gap-1'), span(setClass('text-gray-500 text-sm'), $lang->waibao->consumedHours . '：'), span(setClass('font-bold text-green-600'), round($internalSummary['consumed'] ?? 0, 1))),
+        div(setClass('flex items-center gap-1'), span(setClass('text-gray-500 text-sm'), $lang->waibao->remainHours . '：'), span(setClass('font-bold'), round($internalSummary['remain'] ?? 0, 1))),
+        div(setClass('flex items-center gap-1'), span(setClass('text-gray-500 text-sm'), $lang->waibao->internalCount . '：'), span(setClass('font-bold'), ($internalSummary['count'] ?? 0) . '人')),
+        /* 分隔 */
+        span(setClass('text-gray-300'), '|'),
+        /* 外包人员 */
+        span(setClass('text-gray-400 text-sm font-medium'), $lang->waibao->outsourcedLabel . '：'),
+        div(setClass('flex items-center gap-1'), span(setClass('text-gray-500 text-sm'), $lang->waibao->estimatedHours . '：'), span(setClass('font-bold'), round($outsourcedSummary['estimated'] ?? 0, 1))),
+        div(setClass('flex items-center gap-1'), span(setClass('text-gray-500 text-sm'), $lang->waibao->consumedHours . '：'), span(setClass('font-bold text-orange-500'), round($outsourcedSummary['consumed'] ?? 0, 1))),
+        div(setClass('flex items-center gap-1'), span(setClass('text-gray-500 text-sm'), $lang->waibao->remainHours . '：'), span(setClass('font-bold'), round($outsourcedSummary['remain'] ?? 0, 1))),
+        div(setClass('flex items-center gap-1'), span(setClass('text-gray-500 text-sm'), $lang->waibao->outsourcedCount . '：'), span(setClass('font-bold'), ($outsourcedSummary['count'] ?? 0) . '人')),
+        /* 分隔 */
+        span(setClass('text-gray-300'), '|'),
+        /* 总计 */
+        span(setClass('text-gray-400 text-sm font-medium'), $lang->waibao->totalHours . '：'),
+        div(setClass('flex items-center gap-1'), span(setClass('text-gray-500 text-sm'), $lang->waibao->estimatedHours . '：'), span(setClass('font-bold text-blue-600'), round($totalSummary['estimated'] ?? 0, 1))),
+        div(setClass('flex items-center gap-1'), span(setClass('text-gray-500 text-sm'), $lang->waibao->consumedHours . '：'), span(setClass('font-bold text-green-600'), round($totalSummary['consumed'] ?? 0, 1))),
+        div(setClass('flex items-center gap-1'), span(setClass('text-gray-500 text-sm'), $lang->waibao->remainHours . '：'), span(setClass('font-bold text-orange-600'), round($totalSummary['remain'] ?? 0, 1)))
     )
 );
 

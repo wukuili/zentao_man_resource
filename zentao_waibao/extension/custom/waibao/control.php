@@ -376,26 +376,88 @@ class waibao extends control
     /**
      * 项目级外包工时总览（项目左侧菜单页）。
      *
-     * 展示当前项目团队内各外包人员的已消耗（主）/预计/剩余工时。
+     * 展示当前项目团队内各外包人员的已消耗（主）/预计/剩余工时，支持日期范围筛选。
      *
-     * @param int $projectID 项目ID
+     * @param int    $projectID 项目ID
+     * @param string $begin     开始日期
+     * @param string $end       结束日期
      */
-    public function projectOverview($projectID = 0)
+    public function projectOverview($projectID = 0, $begin = '', $end = '')
     {
         $projectID = (int)$projectID;
         if($projectID <= 0 && $this->session->project) $projectID = (int)$this->session->project;
 
+        /* POST：筛选表单提交，重定向到 GET */
+        if($this->server->request_method == 'POST')
+        {
+            $projectID = (int)($this->post->projectID ?: $projectID);
+            $begin     = str_replace('-', '_', $this->post->begin);
+            $end       = str_replace('-', '_', $this->post->end);
+            $this->locate(inlink('projectOverview', "projectID={$projectID}&begin={$begin}&end={$end}"));
+            return;
+        }
+
+        /* 日期处理：默认本月 */
+        $begin = str_replace('_', '-', $begin);
+        $end   = str_replace('_', '-', $end);
+        if(empty($begin) || $begin == '-') $begin = date('Y-m-01');
+        if(empty($end)   || $end   == '-') $end   = date('Y-m-t');
+
         $project = $projectID > 0 ? $this->loadModel('project')->getByID($projectID) : null;
         if($project) $this->project->setMenu($projectID);
 
-        $data = $this->waibao->getProjectOutsourcedMembers($projectID);
+        $data = $this->waibao->getProjectOutsourcedMembers($projectID, $begin, $end);
 
         $this->view->title     = $this->lang->waibao->projectOverview;
         $this->view->project   = $project;
         $this->view->projectID = $projectID;
+        $this->view->begin     = $begin;
+        $this->view->end       = $end;
         $this->view->members   = isset($data['members']) ? $data['members'] : array();
         $this->view->totalRow  = isset($data['total']) ? $data['total'] : array('consumed' => 0, 'estimated' => 0, 'remain' => 0, 'taskCount' => 0);
 
         $this->display();
+    }
+
+    /**
+     * 导出项目外包工时总览为 CSV（可直接用 Excel 打开）。
+     *
+     * @param int    $projectID 项目ID
+     * @param string $begin     开始日期
+     * @param string $end       结束日期
+     */
+    public function exportProjectOverview($projectID = 0, $begin = '', $end = '')
+    {
+        $projectID = (int)$projectID;
+        if($projectID <= 0 && $this->session->project) $projectID = (int)$this->session->project;
+
+        $begin = str_replace('_', '-', $begin);
+        $end   = str_replace('_', '-', $end);
+        if(empty($begin) || $begin == '-') $begin = date('Y-m-01');
+        if(empty($end)   || $end   == '-') $end   = date('Y-m-t');
+
+        $data    = $this->waibao->getProjectOutsourcedMembers($projectID, $begin, $end);
+        $members = isset($data['members']) ? $data['members'] : array();
+        $total   = isset($data['total'])   ? $data['total']   : array('consumed' => 0, 'estimated' => 0, 'remain' => 0, 'taskCount' => 0);
+
+        $project  = $projectID > 0 ? $this->loadModel('project')->getByID($projectID) : null;
+        $projName = $project ? $project->name : $projectID;
+
+        $filename = rawurlencode("项目外包工时_{$projName}_{$begin}_{$end}.csv");
+        header('Content-Type: text/csv; charset=utf-8');
+        header("Content-Disposition: attachment; filename*=UTF-8''{$filename}");
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        header('Pragma: no-cache');
+
+        echo "\xEF\xBB\xBF";
+        $out = fopen('php://output', 'w');
+        fputcsv($out, array('姓名', '部门', '已消耗工时(h)', '预计工时(h)', '剩余工时(h)', '任务数'));
+        foreach($members as $m)
+        {
+            fputcsv($out, array($m['realname'], $m['deptName'], $m['consumed'], $m['estimated'], $m['remain'], $m['taskCount']));
+        }
+        fputcsv($out, array('合计', '', $total['consumed'], $total['estimated'], $total['remain'], $total['taskCount']));
+        fclose($out);
+        exit;
     }
 }
