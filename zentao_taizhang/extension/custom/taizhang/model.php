@@ -3,9 +3,50 @@
  * 项目台账 — 模型层
  * 所有数据查询与写入均通过 ZenTao DAO 进行，禁止拼接原始 SQL。
  */
-class taizhang extends model
+class taizhangModel extends model
 {
     const TABLE = 'zt_taizhang';
+
+    /**
+     * 自动同步：为尚未建立台账的现有项目补建台账记录。
+     *
+     * 仅针对禅道「项目」(type=project) 且未删除的项目；已存在台账记录
+     * （含软删除）的项目会被跳过，既避免触发 projectID 唯一键冲突，
+     * 也不会「复活」用户已手动删除的台账行。幂等：重复调用不会重复插入。
+     *
+     * @return int 本次新建的台账条数
+     */
+    public function syncFromProjects()
+    {
+        $projects = $this->dao->select('id, name')->from('zt_project')
+            ->where('type')->eq('project')
+            ->andWhere('deleted')->eq('0')
+            ->orderBy('id asc')
+            ->fetchAll('id');
+        if(empty($projects)) return 0;
+
+        /* 已有台账的 projectID（含软删除），避免唯一键冲突与复活已删行 */
+        $existing = $this->dao->select('projectID')->from(self::TABLE)
+            ->where('projectID')->ne(0)
+            ->fetchPairs('projectID', 'projectID');
+
+        $now   = date('Y-m-d H:i:s');
+        $count = 0;
+        foreach($projects as $id => $project)
+        {
+            if(isset($existing[$id])) continue;
+
+            $data = new stdclass();
+            $data->projectID = $id;
+            $data->shortName = $project->name;
+            $data->createdAt = $now;
+            $data->updatedAt = $now;
+            $data->deleted   = 0;
+            $this->dao->insert(self::TABLE)->data($data)->exec();
+            if(!dao::isError()) $count++;
+        }
+        return $count;
+    }
 
     /**
      * 获取台账列表（带关联项目信息和计算字段）

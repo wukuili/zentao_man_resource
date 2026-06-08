@@ -29,6 +29,9 @@ class taizhang extends control
         $pm        = $this->get->pm        ?? $pm;
         $rdManager = $this->get->rdManager ?? $rdManager;
 
+        /* 自动从现有项目列表补建台账：保证新项目无需手动添加即出现在列表中 */
+        $this->taizhang->syncFromProjects();
+
         $entries   = $this->taizhang->getList($phase, $pm, $rdManager);
         $summary   = $this->taizhang->calcSummary($entries);
         $pmOptions = $this->taizhang->getPMOptions();
