@@ -14,10 +14,13 @@ if(!isset($lang->navIconNames)) $lang->navIconNames = array();
 $lang->navIcons['taizhang']     = "<i class='icon icon-table'></i>";
 $lang->navIconNames['taizhang'] = 'table';
 
-/* 1) 顶级主导航项（字符串格式，含图标），排在「组织(60)」与「后台(65)」之间 */
+/* 1) 顶级主导航项（字符串格式，含图标）。
+ * 注意：下标 62 已被商业版 OA(办公) 占用（extension/max/.../zentaobiz.php:
+ *   $lang->mainNav->menuOrder[62] = 'oa';），台账 ext 在其后加载，若复用 62
+ *   会把 OA 顶替掉。故改用未被占用的 64，排在「OA(62)」之后、「后台(65)」之前。 */
 if(!isset($lang->mainNav)) $lang->mainNav = new stdclass();
 $lang->mainNav->taizhang      = "{$lang->navIcons['taizhang']} 项目台账|taizhang|browse|";
-$lang->mainNav->menuOrder[62] = 'taizhang';
+$lang->mainNav->menuOrder[64] = 'taizhang';
 
 /* 2) 进入 taizhang 应用后的顶部一级导航标签 */
 if(!isset($lang->taizhang)) $lang->taizhang = new stdclass();

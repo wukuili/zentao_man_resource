@@ -8,33 +8,66 @@ class taizhangModel extends model
     const TABLE = 'zt_taizhang';
 
     /**
-     * 自动同步：为尚未建立台账的现有项目补建台账记录。
+     * 自动同步：使台账始终镜像禅道「项目列表」(type=project、未删除)。
      *
-     * 仅针对禅道「项目」(type=project) 且未删除的项目；已存在台账记录
-     * （含软删除）的项目会被跳过，既避免触发 projectID 唯一键冲突，
-     * 也不会「复活」用户已手动删除的台账行。幂等：重复调用不会重复插入。
+     * 规则（幂等，每次进入 browse 都会执行）：
+     *   1) projectID 不在「当前有效项目集」里的同步行 → 软删（含历史误同步的
+     *      program、以及禅道里已删除的项目）；projectID=0 的手动行不受影响。
+     *   2) 当前有效项目若已有台账行但处于软删状态(deleted=1) → 复活(deleted=0)，
+     *      仅翻转删除标记，保留用户已填写的成本/人月等字段。
+     *   3) 当前有效项目若无任何台账行 → 新建。
      *
-     * @return int 本次新建的台账条数
+     * 注意：因为要求「始终镜像项目列表」，手动删除某个 synced 行后，下次
+     * 进入页面会被规则 2 自动复活——这是预期行为。
+     *
+     * @return int 本次新建 + 复活的台账条数
      */
     public function syncFromProjects()
     {
+        /* 与禅道「项目列表」(project-browse) 对齐：仅 type=project、未删除。
+         * 不可包含 program(项目集)，否则台账会多出项目列表里没有的行。
+         * 注意：不能按 vision 过滤——台账作为自定义模块，其上下文 config->vision
+         * 并非项目列表的视图值，加上后会把项目几乎全部误滤掉。 */
         $projects = $this->dao->select('id, name')->from('zt_project')
             ->where('type')->eq('project')
             ->andWhere('deleted')->eq('0')
             ->orderBy('id asc')
             ->fetchAll('id');
+
         if(empty($projects)) return 0;
 
-        /* 已有台账的 projectID（含软删除），避免唯一键冲突与复活已删行 */
-        $existing = $this->dao->select('projectID')->from(self::TABLE)
+        $validIDs = array_keys($projects);
+
+        /* 清理与项目列表口径不符的同步行：projectID 不在"当前有效 type=project 集合"里的
+         * 关联行（含历史误同步的 program、以及禅道里已被删除的项目）一律软删；
+         * projectID=0 的手动台账行不受影响。保证台账始终与项目列表一致。 */
+        $this->dao->update(self::TABLE)->set('deleted')->eq(1)
+            ->where('deleted')->eq(0)
+            ->andWhere('projectID')->ne(0)
+            ->andWhere('projectID')->notIN($validIDs)
+            ->exec();
+
+        /* 已有台账行（含软删除），按 projectID 取其删除状态：
+         * 用于区分「需复活的软删行」与「已存在的正常行」，避免唯一键冲突。 */
+        $existing = $this->dao->select('projectID, deleted')->from(self::TABLE)
             ->where('projectID')->ne(0)
-            ->fetchPairs('projectID', 'projectID');
+            ->fetchPairs('projectID', 'deleted');
 
         $now   = date('Y-m-d H:i:s');
         $count = 0;
         foreach($projects as $id => $project)
         {
-            if(isset($existing[$id])) continue;
+            if(isset($existing[$id]))
+            {
+                /* 已有正常行：跳过；已有软删行：复活（只翻转删除标记，保留用户填写的字段） */
+                if($existing[$id] == '1')
+                {
+                    $this->dao->update(self::TABLE)->set('deleted')->eq(0)->set('updatedAt')->eq($now)
+                        ->where('projectID')->eq($id)->exec();
+                    if(!dao::isError()) $count++;
+                }
+                continue;
+            }
 
             $data = new stdclass();
             $data->projectID = $id;
@@ -58,6 +91,9 @@ class taizhangModel extends model
      */
     public function getList($phase = '', $pm = '', $rdManager = '')
     {
+        /* 台账表内容由 syncFromProjects() 维护：仅含 type=project 行，program 等已软删。
+         * 故此处只需按 t.deleted 过滤，无需再 join 过滤 p.type（早期的 OR 括号写法在部分
+         * 禅道版本下会生成异常 SQL，把结果误收窄，已移除）。 */
         $query = $this->dao->select('t.*, p.name AS projectName, p.pm AS pmAccount, p.status AS projectStatus')
             ->from(self::TABLE . ' t')
             ->leftJoin('zt_project p')->on('t.projectID = p.id')

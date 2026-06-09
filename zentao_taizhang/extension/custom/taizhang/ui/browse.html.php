@@ -45,7 +45,7 @@ toolbar
 
 /* ── 筛选栏 + 数据表 ── */
 $buildSelect = function($id, $name, $options, $current) {
-    $html  = "<select id=\"{$id}\" name=\"{$name}\" class=\"form-control\" style=\"min-width:110px;padding:4px 8px;font-size:13px;\">";
+    $html  = "<select id=\"{$id}\" name=\"{$name}\" class=\"form-control\" style=\"max-width:110px;padding:4px 8px;font-size:13px;\">";
     foreach($options as $val => $label) {
         $selected = ((string)$val === (string)$current) ? ' selected' : '';
         $html .= "<option value=\"" . htmlspecialchars((string)$val) . "\"{$selected}>" . htmlspecialchars($label) . "</option>";
