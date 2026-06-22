@@ -1,0 +1,12 @@
+{
+    "code": "crmsync",
+    "name": "CRM对接",
+    "version": "1.1.0",
+    "zentaoVersion": ">=20.0",
+    "author": "李永杰",
+    "email": "wukuili@gmail.com",
+    "description": "禅道与外部CRM(神思综合管理平台)对接插件。商机赢单后由CRM回调自动创建融合瀑布项目，或手动同步时选择新建项目/关联现有项目；同步合同金额(写入项目预算)、回款金额等信息，并联动写入项目台账(zt_taizhang，合同金额为空时回退用预计金额)；对外提供产品列表、项目列表接口，按商机ID幂等防重，提供同步记录与失败重试。",
+    "type": "extension",
+    "depend": [],
+    "incompatible": []
+}

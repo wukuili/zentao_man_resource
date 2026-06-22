@@ -16,6 +16,11 @@ install: |
 
 # 版本信息。
 releases:
+  1.1:
+    zentaoversion: 20.0+,biz10.0+,max5.0+,ipd2.0+
+    charge: free
+    changelog: 新增项目列表接口(crmsync-projects)与"关联现有项目"同步模式(mode=link)；已同步商机再次同步时刷新金额；同步时联动写入项目台账zt_taizhang(合同金额→revenue、回款金额→receivedAmount，元转万元，合同金额为空时回退用预计金额，台账未安装时自动跳过)；金额变动以项目动态留痕。
+    date: 2026-06-12
   1.0:
     zentaoversion: 20.0+,biz10.0+,max5.0+,ipd2.0+
     charge: free

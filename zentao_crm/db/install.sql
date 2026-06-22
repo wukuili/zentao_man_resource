@@ -1,7 +1,8 @@
 CREATE TABLE IF NOT EXISTS `zt_crmsync_map` (
   `id`            mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
   `opportunityId` varchar(64)  NOT NULL DEFAULT ''  COMMENT 'CRM商机ID',
-  `projectID`     mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT '禅道项目ID',
+  `projectID`     mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT '禅道目标ID(项目或项目集, 由targetType区分)',
+  `targetType`    enum('project','program') NOT NULL DEFAULT 'project' COMMENT '同步目标类型',
   `productId`     mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT '关联产品ID, 0=单纯项目',
   `customerName`  varchar(255) NOT NULL DEFAULT '' COMMENT '客户名称',
   `oppName`       varchar(255) NOT NULL DEFAULT '' COMMENT '商机名称',

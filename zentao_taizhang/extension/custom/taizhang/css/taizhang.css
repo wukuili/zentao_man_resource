@@ -32,17 +32,53 @@
     margin-left: auto;
 }
 
+/* 统计区：汇总当前筛选条件下的全部数据（不受分页影响） */
+.tz-stats-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+.tz-stat-card {
+    flex: 1 1 130px;
+    min-width: 110px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-left: 3px solid #4a9ed7;
+    border-radius: 4px;
+    padding: 8px 12px;
+}
+.tz-stat-label {
+    font-size: 12px;
+    color: #888;
+    white-space: nowrap;
+}
+.tz-stat-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #333;
+    margin-top: 2px;
+}
+.tz-stat-card.tz-stat-warn   { border-left-color: #dc3545; }
+.tz-stat-card.tz-stat-warn   .tz-stat-value { color: #dc3545; }
+.tz-stat-card.tz-stat-danger { border-left-color: #dc3545; background: #fdeeee; }
+.tz-stat-card.tz-stat-danger .tz-stat-value { color: #dc3545; }
+
 /* 台账表格 */
 .tz-table-wrap {
-    overflow-x: auto;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: scroll;
+    overflow-y: visible;
     border-radius: 4px;
     border: 1px solid #e0e0e0;
+    padding-bottom: 8px;
 }
 .tz-table {
-    width: 100%;
+    width: max-content;
     border-collapse: collapse;
     font-size: 13px;
-    min-width: 1200px;
+    min-width: 4200px;
 }
 .tz-table thead th {
     background: #4a9ed7;
@@ -72,6 +108,12 @@
 .tz-table .td-status  { max-width: 260px; white-space: pre-wrap; word-break: break-word; font-size: 12px; line-height: 1.6; }
 .tz-table .td-members { max-width: 200px; font-size: 12px; color: #555; }
 .tz-table .td-serial  { color: #888; }
+.tz-table .td-program { max-width: 140px; font-size: 12px; color: #555; word-break: break-word; }
+.tz-table .tz-na      { color: #bbb; }
+
+/* 项目集归集：同组合并单元格固定底色并垂直居中，组与组之间加分隔线 */
+.tz-table tbody td.td-program { vertical-align: middle; background-color: #fafbfc !important; }
+.tz-table tbody tr.tz-group-start td { border-top: 2px solid #c9d4e0; }
 
 /* 数值类 */
 .tz-table .td-num     { text-align: right; font-variant-numeric: tabular-nums; }
@@ -94,6 +136,19 @@
 /* 操作列 */
 .tz-actions { display: flex; gap: 6px; justify-content: center; white-space: nowrap; }
 .tz-actions a { font-size: 12px; }
+
+/* 分页 */
+.tz-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 4px 4px;
+    font-size: 13px;
+}
+.tz-pager-info { color: #666; white-space: nowrap; }
+.tz-pager-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.tz-pager .disabled { pointer-events: none; opacity: .55; }
 
 /* 编辑表单 */
 .tz-form-panel { max-width: 780px; margin: 0 auto; }

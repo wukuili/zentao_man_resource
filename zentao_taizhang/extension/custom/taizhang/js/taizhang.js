@@ -5,17 +5,26 @@
      * 台账筛选表单提交 — 收集三个下拉值，跳转到过滤后的 URL
      */
     window.tzSubmitFilter = function() {
-        var phase     = document.getElementById('tzFilterPhase');
-        var pm        = document.getElementById('tzFilterPM');
-        var rdManager = document.getElementById('tzFilterRD');
-        var baseURL   = window.tzBrowseURL || '';
+        var fields = {
+            phase: document.getElementById('tzFilterPhase'),
+            category: document.getElementById('tzFilterCategory'),
+            pm: document.getElementById('tzFilterPM'),
+            projectStatus: document.getElementById('tzFilterStatus')
+        };
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = window.tzBrowseURL || '';
 
-        var params = [];
-        if(phase && phase.value)     params.push('phase='     + encodeURIComponent(phase.value));
-        if(pm && pm.value)           params.push('pm='        + encodeURIComponent(pm.value));
-        if(rdManager && rdManager.value) params.push('rdManager=' + encodeURIComponent(rdManager.value));
+        Object.keys(fields).forEach(function(name) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            input.value = fields[name] ? fields[name].value : '';
+            form.appendChild(input);
+        });
 
-        window.location.href = baseURL + (params.length ? '?' + params.join('&') : '');
+        document.body.appendChild(form);
+        form.submit();
     };
 
     /**
@@ -51,6 +60,25 @@
         };
         xhr.send('');
     };
+
+    /**
+     * 项目类别联动：分包合同状态/开工资料是否齐全/安保措施是否到位/是否涉及危险作业
+     * 仅施工类、集成类项目展示；初始可见性已由服务端按当前值渲染，这里只处理切换。
+     */
+    window.tzToggleCategoryFields = function() {
+        var sel = document.getElementById('projectCategory');
+        if(!sel) return;
+        var show = (sel.value === '集成类' || sel.value === '施工类');
+        var fields = document.querySelectorAll('.tz-cond-field');
+        for(var i = 0; i < fields.length; i++) {
+            fields[i].style.display = show ? '' : 'none';
+        }
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var sel = document.getElementById('projectCategory');
+        if(sel) sel.addEventListener('change', window.tzToggleCategoryFields);
+    });
 
     /**
      * 编辑表单 AJAX 提交

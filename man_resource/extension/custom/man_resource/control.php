@@ -12,7 +12,7 @@ class man_resource extends control
     /**
      * 组织资源日历 (Org Resource Calendar)
      */
-    public function orgdimension($status = 'todo', $begin = '', $end = '', $depts = '', $roles = '', $users = '', $project = 0, $showHoliday = 0, $execution = 0)
+    public function orgdimension($status = 'todo', $begin = '', $end = '', $depts = '', $roles = '', $users = '', $project = 0, $showHoliday = 0, $execution = 0, $viewType = 'day')
     {
         if(!empty($_POST))
         {
@@ -25,11 +25,13 @@ class man_resource extends control
             $project     = (int)$this->post->project;
             $showHoliday = $this->post->showHoliday ? 1 : 0;
             $execution   = (int)$this->post->execution;
+            $viewType    = in_array($this->post->viewType, array('day', 'week', 'month')) ? $this->post->viewType : 'day';
+            if($viewType != 'day') $showHoliday = 1;
 
             $begin = str_replace('-', '_', $begin);
             $end   = str_replace('-', '_', $end);
 
-            $link = $this->createLink('man_resource', 'orgdimension', "status=$status&begin=$begin&end=$end&depts=$depts&roles=$roles&users=$users&project=$project&showHoliday=$showHoliday&execution=$execution");
+            $link = $this->createLink('man_resource', 'orgdimension', "status=$status&begin=$begin&end=$end&depts=$depts&roles=$roles&users=$users&project=$project&showHoliday=$showHoliday&execution=$execution&viewType=$viewType");
             if(helper::isAjaxRequest()) return $this->send(array('result' => 'success', 'locate' => $link));
             $this->locate($link);
         }
@@ -42,6 +44,9 @@ class man_resource extends control
         list($defaultBegin, $defaultEnd) = $this->man_resource->getDefaultDateRange($status);
         $begin = empty($begin) ? $defaultBegin : $begin;
         $end   = empty($end)   ? $defaultEnd   : $end;
+        list($begin, $end) = $this->man_resource->clampRangeByStatus($status, $begin, $end);
+        if(!in_array($viewType, array('day', 'week', 'month'))) $viewType = 'day';
+        if($viewType != 'day') $showHoliday = 1;
         $this->view->begin  = $begin;
         $this->view->end    = $end;
 
@@ -51,6 +56,7 @@ class man_resource extends control
         $this->view->project     = $project;
         $this->view->showHoliday = $showHoliday;
         $this->view->execution   = $execution;
+        $this->view->viewType    = $viewType;
 
         $this->view->departments  = $this->loadModel('dept')->getOptionMenu();
         $this->view->rolePairs    = $this->lang->user->roleList;
@@ -62,20 +68,8 @@ class man_resource extends control
         $this->view->roleID       = $roles;
 
         $this->view->calendarData = $this->man_resource->getOrgCalendarData($this->view->begin, $this->view->end, $status, $this->view->depts, $this->view->roles, $this->view->users, $this->view->project, $this->view->showHoliday, $this->view->execution);
-        $this->view->dailySeries  = $this->man_resource->getDailyLoadSeries(array_keys($this->view->calendarData), $this->view->begin, $this->view->end, $status, $this->view->execution);
-
-        /* TEMP DEBUG: dump team task data for ALL users */
-        $debugLines = array();
-        $calendarAccounts = array_keys($this->view->calendarData);
-        foreach($calendarAccounts as $acc)
-        {
-            $d = $this->view->calendarData[$acc];
-            if($d['estimated_hours'] == 0 && $d['consumed_hours'] == 0 && $d['remain_hours'] == 0)
-            {
-                $debugLines[] = $this->man_resource->debugUserTeamData($acc, $this->view->begin, $this->view->end, $status);
-            }
-        }
-        $this->view->debugInfo = implode("\n", $debugLines);
+        $this->view->dailySeries  = $this->man_resource->getDailyLoadSeries(array_keys($this->view->calendarData), $this->view->begin, $this->view->end, $status, $this->view->execution, $this->view->project);
+        $this->view->calendarGrid = $this->man_resource->buildCalendarGrid($this->view->calendarData, $this->view->dailySeries, $this->view->begin, $this->view->end, $viewType, $showHoliday);
         
         /* Variables for ZIN UI */
         $this->view->today            = date('Y-m-d');
@@ -92,7 +86,7 @@ class man_resource extends control
     /**
      * 项目资源日历 (Project Resource Calendar)
      */
-    public function projectdimension($projectID = 0, $status = 'todo', $begin = '', $end = '', $users = '', $showHoliday = 0, $execution = 0)
+    public function projectdimension($projectID = 0, $status = 'todo', $begin = '', $end = '', $users = '', $showHoliday = 0, $execution = 0, $viewType = 'day')
     {
         if(!empty($_POST))
         {
@@ -103,11 +97,13 @@ class man_resource extends control
             $users       = is_array($this->post->users) ? implode(',', $this->post->users) : $this->post->users;
             $showHoliday = $this->post->showHoliday ? 1 : 0;
             $execution   = (int)$this->post->execution;
+            $viewType    = in_array($this->post->viewType, array('day', 'week', 'month')) ? $this->post->viewType : 'day';
+            if($viewType != 'day') $showHoliday = 1;
 
             $begin = str_replace('-', '_', $begin);
             $end   = str_replace('-', '_', $end);
 
-            $link = $this->createLink('man_resource', 'projectdimension', "projectID=$projectID&status=$status&begin=$begin&end=$end&users=$users&showHoliday=$showHoliday&execution=$execution");
+            $link = $this->createLink('man_resource', 'projectdimension', "projectID=$projectID&status=$status&begin=$begin&end=$end&users=$users&showHoliday=$showHoliday&execution=$execution&viewType=$viewType");
             if(helper::isAjaxRequest()) return $this->send(array('result' => 'success', 'locate' => $link));
             $this->locate($link);
         }
@@ -121,11 +117,15 @@ class man_resource extends control
         list($defaultBegin, $defaultEnd) = $this->man_resource->getDefaultDateRange($status);
         $begin = empty($begin) ? $defaultBegin : $begin;
         $end   = empty($end)   ? $defaultEnd   : $end;
+        list($begin, $end) = $this->man_resource->clampRangeByStatus($status, $begin, $end);
+        if(!in_array($viewType, array('day', 'week', 'month'))) $viewType = 'day';
+        if($viewType != 'day') $showHoliday = 1;
         $this->view->begin       = $begin;
         $this->view->end         = $end;
         $this->view->users       = is_array($users) ? implode(',', $users) : $users;
         $this->view->showHoliday = $showHoliday;
         $this->view->execution   = $execution;
+        $this->view->viewType    = $viewType;
 
         $this->view->projects = $this->loadModel('project')->getPairs();
         if($projectID == 0 && !empty($this->view->projects)) $projectID = key($this->view->projects);
@@ -136,7 +136,8 @@ class man_resource extends control
 
         $this->view->calendarData = $this->man_resource->getProjectCalendarData($projectID, $this->view->begin, $this->view->end, $status, $this->view->users, $this->view->showHoliday, $this->view->execution);
         $this->view->conflicts    = $this->man_resource->getProjectConflicts($projectID, $this->view->begin, $this->view->end, $this->view->users, 1.0, $this->view->execution);
-        $this->view->dailySeries  = $this->man_resource->getDailyLoadSeries(array_keys($this->view->calendarData), $this->view->begin, $this->view->end, $status, $this->view->execution);
+        $this->view->dailySeries  = $this->man_resource->getDailyLoadSeries(array_keys($this->view->calendarData), $this->view->begin, $this->view->end, $status, $this->view->execution, $projectID);
+        $this->view->calendarGrid = $this->man_resource->buildCalendarGrid($this->view->calendarData, $this->view->dailySeries, $this->view->begin, $this->view->end, $viewType, $showHoliday);
         $this->view->ganttData    = $this->man_resource->getProjectGanttData($projectID, $this->view->begin, $this->view->end, $this->view->users, $this->view->execution);
         
         /* Variables for ZIN UI */
@@ -151,7 +152,7 @@ class man_resource extends control
     /**
      * 个人资源日历 (Member Resource Calendar)
      */
-    public function memberdimension($userID = '', $status = 'todo', $begin = '', $end = '', $showHoliday = 0, $execution = 0)
+    public function memberdimension($userID = '', $status = 'todo', $begin = '', $end = '', $showHoliday = 0, $execution = 0, $projectID = 0)
     {
         if(!empty($_POST))
         {
@@ -161,11 +162,12 @@ class man_resource extends control
             $end         = $this->post->end;
             $showHoliday = $this->post->showHoliday ? 1 : 0;
             $execution   = (int)$this->post->execution;
+            $projectID   = (int)$this->post->projectID;
 
             $begin = str_replace('-', '_', $begin);
             $end   = str_replace('-', '_', $end);
 
-            $link = $this->createLink('man_resource', 'memberdimension', "userID=$userID&status=$status&begin=$begin&end=$end&showHoliday=$showHoliday&execution=$execution");
+            $link = $this->createLink('man_resource', 'memberdimension', "userID=$userID&status=$status&begin=$begin&end=$end&showHoliday=$showHoliday&execution=$execution&projectID=$projectID");
             if(helper::isAjaxRequest()) return $this->send(array('result' => 'success', 'locate' => $link));
             $this->locate($link);
         }
@@ -178,18 +180,22 @@ class man_resource extends control
         list($defaultBegin, $defaultEnd) = $this->man_resource->getDefaultDateRange($status);
         $begin = empty($begin) ? $defaultBegin : $begin;
         $end   = empty($end)   ? $defaultEnd   : $end;
+        list($begin, $end) = $this->man_resource->clampRangeByStatus($status, $begin, $end);
         $this->view->begin       = $begin;
         $this->view->end         = $end;
         $this->view->showHoliday = $showHoliday;
         $this->view->execution   = $execution;
+        $this->view->projectID   = (int)$projectID;
 
         $this->view->userList = $this->loadModel('user')->getPairs('noletter');
-        $this->view->executionList = $this->man_resource->getExecutionPairs();
+        $this->view->projectList = array(0 => '') + $this->loadModel('project')->getPairs();
+        $this->view->executionList = $this->man_resource->getExecutionPairs($projectID);
         if(empty($userID)) $userID = key($this->view->userList);
         $this->view->userID = $userID;
 
-        $this->view->calendarData = $this->man_resource->getUserCalendarData($userID, $this->view->begin, $this->view->end, $status, $this->view->showHoliday, $this->view->execution);
-        $this->view->taskList     = $this->man_resource->getUserTasks($userID, $this->view->begin, $this->view->end, $status, $this->view->execution);
+        $this->view->calendarData = $this->man_resource->getUserLoadRate($userID, $this->view->begin, $this->view->end, $status, $this->view->showHoliday, $projectID, $this->view->execution);
+        $this->view->taskList     = $this->man_resource->getUserTasks($userID, $this->view->begin, $this->view->end, $status, $this->view->execution, $projectID);
+        $this->view->workItemList = $this->man_resource->getUserWorkItems($userID, $this->view->begin, $this->view->end, $status, $projectID, $this->view->execution);
         
         /* Variables for ZIN UI */
         $this->view->today            = date('Y-m-d');

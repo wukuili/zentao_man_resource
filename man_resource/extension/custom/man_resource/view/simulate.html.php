@@ -72,8 +72,6 @@ panel
         ))
     )
 );
-// __CONTINUE_HERE__
-
 if(!empty($lastResult))
 {
     panel

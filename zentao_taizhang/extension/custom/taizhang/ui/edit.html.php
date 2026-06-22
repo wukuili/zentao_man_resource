@@ -5,13 +5,15 @@ declare(strict_types=1);
  */
 namespace zin;
 
-$entry       = $this->view->entry;
-$id          = (int)$this->view->id;
-$projectList = $this->view->projectList;
-$phaseList   = $this->view->phaseList;
-$userList    = $this->view->userList;
-$saveURL     = $this->view->saveURL;
-$browseURL   = helper::createLink('taizhang', 'browse');
+$entry        = $this->view->entry;
+$id           = (int)$this->view->id;
+$projectList  = $this->view->projectList;
+$phaseList    = $this->view->phaseList;
+$categoryList = $this->view->categoryList;
+$yesNoList    = $this->view->yesNoList;
+$userList     = $this->view->userList;
+$saveURL      = $this->view->saveURL;
+$browseURL    = helper::createLink('taizhang', 'browse');
 
 /* 当前字段值（编辑时取已有，新增时为空/默认） */
 $v = function($field, $default = '') use ($entry) {
@@ -36,8 +38,18 @@ $buildSelect = function($name, $options, $current, $class = '') {
 
 $phaseSelect   = $buildSelect('phase',     $phaseList,   $v('phase'),     'form-control');
 $projectSelect = $buildSelect('projectID', $projectList, $v('projectID'), 'form-control');
-$pmSelect      = array(0 => '-- 请选择研发经理 --') + (array)$userList;
-$rdSelect      = $buildSelect('rdManager', $pmSelect,    $v('rdManager'), 'form-control');
+
+$categoryOptions = array('' => '-- 请选择 --') + $categoryList;
+$yesNoOptions     = array('' => '-- 请选择 --') + $yesNoList;
+$categorySelect          = $buildSelect('projectCategory',   $categoryOptions, $v('projectCategory'),   'form-control');
+$securityMeasuresSelect  = $buildSelect('securityMeasures',  $yesNoOptions,    $v('securityMeasures'),  'form-control');
+$hazardousWorkSelect     = $buildSelect('hazardousWork',     $yesNoOptions,    $v('hazardousWork'),     'form-control');
+$startDocsCompleteSelect = $buildSelect('startDocsComplete', $yesNoOptions,    $v('startDocsComplete'), 'form-control');
+
+/* 分包合同状态/开工资料是否齐全/安保措施是否到位/是否涉及危险作业仅适用于施工类/集成类项目，
+ * 软件类项目不展示这几项；初始可见性由当前已选项目类别决定，后续由 JS 监听 select 变化切换。 */
+$showConstructionFields = in_array($v('projectCategory'), array('集成类', '施工类'), true);
+$condFieldStyle = $showConstructionFields ? '' : ' style="display:none"';
 
 /* 构建表单 HTML */
 $formHTML  = '<form id="tzEditForm" method="post" action="' . $saveURL . '">';
@@ -56,10 +68,10 @@ $formHTML .= '<input type="text" name="shortName" id="shortName" class="form-con
 $formHTML .= '</div>';
 $formHTML .= '</div>';
 
-/* 第二行：项目阶段 + 研发经理 */
+/* 项目阶段 + 项目类别 */
 $formHTML .= '<div class="tz-form-row">';
 $formHTML .= '<div class="tz-form-group"><label>项目阶段</label>' . $phaseSelect . '</div>';
-$formHTML .= '<div class="tz-form-group"><label>研发经理</label>' . $rdSelect . '</div>';
+$formHTML .= '<div class="tz-form-group"><label>项目类别</label>' . $categorySelect . '</div>';
 $formHTML .= '</div>';
 
 /* 当前项目情况 */
@@ -68,37 +80,91 @@ $formHTML .= '<label>当前项目情况</label>';
 $formHTML .= '<textarea name="currentStatus" id="currentStatus" class="form-control" rows="5" placeholder="描述当前项目进展、风险等情况">' . $v('currentStatus') . '</textarea>';
 $formHTML .= '</div>';
 
+/* 项目简介 */
+$formHTML .= '<div class="tz-form-group">';
+$formHTML .= '<label>项目简介</label>';
+$formHTML .= '<textarea name="projectIntro" id="projectIntro" class="form-control" rows="3" placeholder="项目背景、范围等简要介绍">' . $v('projectIntro') . '</textarea>';
+$formHTML .= '</div>';
+
+/* 合同与工程信息 */
+$formHTML .= '<div style="font-weight:600;font-size:13px;color:#4a9ed7;margin:14px 0 8px;padding-bottom:4px;border-bottom:2px solid #4a9ed7">合同与工程信息</div>';
+$formHTML .= '<div class="tz-form-row">';
+$formHTML .= '<div class="tz-form-group"><label>合同签署时间</label><input type="date" name="contractSignDate" class="form-control" value="' . $v('contractSignDate') . '"></div>';
+$formHTML .= '<div class="tz-form-group tz-cond-field" id="tz-field-subcontractStatus"' . $condFieldStyle . '><label>分包合同状态</label><input type="text" name="subcontractStatus" class="form-control" value="' . $v('subcontractStatus') . '"></div>';
+$formHTML .= '</div>';
+$formHTML .= '<div class="tz-form-row">';
+$formHTML .= '<div class="tz-form-group"><label>工程状态</label><input type="text" name="engineeringStatus" class="form-control" value="' . $v('engineeringStatus') . '"></div>';
+$formHTML .= '<div class="tz-form-group"><label>采购方式</label><input type="text" name="procurementMethod" class="form-control" value="' . $v('procurementMethod') . '"></div>';
+$formHTML .= '</div>';
+$formHTML .= '<div class="tz-form-row">';
+$formHTML .= '<div class="tz-form-group"><label>供货单位</label><input type="text" name="supplyUnit" class="form-control" value="' . $v('supplyUnit') . '"></div>';
+$formHTML .= '<div class="tz-form-group"><label>安装/施工单位</label><input type="text" name="constructionUnit" class="form-control" value="' . $v('constructionUnit') . '"></div>';
+$formHTML .= '</div>';
+
+/* 计划与实际进度 */
+$formHTML .= '<div style="font-weight:600;font-size:13px;color:#4a9ed7;margin:14px 0 8px;padding-bottom:4px;border-bottom:2px solid #4a9ed7">计划与实际进度</div>';
+$formHTML .= '<div class="tz-form-row">';
+$formHTML .= '<div class="tz-form-group"><label>计划开工日期</label><input type="date" name="planStartDate" class="form-control" value="' . $v('planStartDate') . '"></div>';
+$formHTML .= '<div class="tz-form-group"><label>实际开工日期</label><input type="date" name="actualStartDate" class="form-control" value="' . $v('actualStartDate') . '"></div>';
+$formHTML .= '</div>';
+$formHTML .= '<div class="tz-form-row">';
+$formHTML .= '<div class="tz-form-group"><label>计划完工日期</label><input type="date" name="planEndDate" class="form-control" value="' . $v('planEndDate') . '"></div>';
+$formHTML .= '<div class="tz-form-group"><label>实际完工日期</label><input type="date" name="actualEndDate" class="form-control" value="' . $v('actualEndDate') . '"></div>';
+$formHTML .= '</div>';
+
+/* 验收与安全管理 */
+$formHTML .= '<div style="font-weight:600;font-size:13px;color:#4a9ed7;margin:14px 0 8px;padding-bottom:4px;border-bottom:2px solid #4a9ed7">验收与安全管理</div>';
+$formHTML .= '<div class="tz-form-row">';
+$formHTML .= '<div class="tz-form-group"><label>验收情况</label><input type="text" name="acceptanceStatus" class="form-control" value="' . $v('acceptanceStatus') . '"></div>';
+$formHTML .= '<div class="tz-form-group tz-cond-field" id="tz-field-startDocsComplete"' . $condFieldStyle . '><label>开工资料是否齐全</label>' . $startDocsCompleteSelect . '</div>';
+$formHTML .= '</div>';
+$formHTML .= '<div class="tz-form-row tz-cond-field" id="tz-row-security"' . $condFieldStyle . '>';
+$formHTML .= '<div class="tz-form-group"><label>安保措施是否到位</label>' . $securityMeasuresSelect . '</div>';
+$formHTML .= '<div class="tz-form-group"><label>是否涉及危险作业</label>' . $hazardousWorkSelect . '</div>';
+$formHTML .= '</div>';
+
 /* 数值字段 — 初始预估 */
 $formHTML .= '<div style="font-weight:600;font-size:13px;color:#4a9ed7;margin:14px 0 8px;padding-bottom:4px;border-bottom:2px solid #4a9ed7">初始预估</div>';
 $formHTML .= '<div class="tz-form-row">';
-$formHTML .= '<div class="tz-form-group"><label>初始预估人月</label><input type="number" name="initEstHours" class="form-control" value="' . $vNum('initEstHours') . '" step="0.01" min="0" placeholder="0.00"></div>';
+$formHTML .= '<div class="tz-form-group"><label>初始预估人天</label><input type="number" name="initEstHours" class="form-control" value="' . $vNum('initEstHours') . '" step="0.01" min="0" placeholder="0.00"></div>';
 $formHTML .= '<div class="tz-form-group"><label>初始预估成本 (万元)</label><input type="number" name="initBudget" class="form-control" value="' . $vNum('initBudget') . '" step="0.01" min="0" placeholder="0.00"></div>';
 $formHTML .= '</div>';
 
 /* 已投入 */
 $formHTML .= '<div style="font-weight:600;font-size:13px;color:#4a9ed7;margin:14px 0 8px;padding-bottom:4px;border-bottom:2px solid #4a9ed7">已投入（实际）</div>';
 $formHTML .= '<div class="tz-form-row">';
-$formHTML .= '<div class="tz-form-group"><label>已投入人月</label><input type="number" name="investedHours" class="form-control" value="' . $vNum('investedHours') . '" step="0.01" min="0" placeholder="0.00"></div>';
+$formHTML .= '<div class="tz-form-group"><label>已投入人天</label><input type="number" name="investedHours" class="form-control" value="' . $vNum('investedHours') . '" step="0.01" min="0" placeholder="0.00"></div>';
 $formHTML .= '<div class="tz-form-group"><label>已投入成本 — 除外购和税 (万元)</label><input type="number" name="investedCost" class="form-control" value="' . $vNum('investedCost') . '" step="0.01" min="0" placeholder="0.00"><div class="tz-form-tip">不含外购硬件及税费的实际人力成本</div></div>';
 $formHTML .= '</div>';
 
 /* 当前预估 */
 $formHTML .= '<div style="font-weight:600;font-size:13px;color:#4a9ed7;margin:14px 0 8px;padding-bottom:4px;border-bottom:2px solid #4a9ed7">当前预估</div>';
 $formHTML .= '<div class="tz-form-row">';
-$formHTML .= '<div class="tz-form-group"><label>当前预估人月</label><input type="number" name="currentEstHours" class="form-control" value="' . $vNum('currentEstHours') . '" step="0.01" min="0" placeholder="0.00"></div>';
+$formHTML .= '<div class="tz-form-group"><label>当前预估人天</label><input type="number" name="currentEstHours" class="form-control" value="' . $vNum('currentEstHours') . '" step="0.01" min="0" placeholder="0.00"></div>';
 $formHTML .= '<div class="tz-form-group"><label>当前预估成本 (万元)</label><input type="number" name="currentBudget" class="form-control" value="' . $vNum('currentBudget') . '" step="0.01" min="0" placeholder="0.00"></div>';
 $formHTML .= '</div>';
 
-/* 合同金额 + 近期成员 + 排序 */
+/* 金额信息 */
 $formHTML .= '<div class="tz-form-row">';
-$formHTML .= '<div class="tz-form-group"><label>合同金额/收入 (万元)</label><input type="number" name="revenue" class="form-control" value="' . $vNum('revenue') . '" step="0.01" min="0" placeholder="0.00"><div class="tz-form-tip">用于计算预估利润率：(合同金额-当前预估成本)÷合同金额×100%</div></div>';
+$formHTML .= '<div class="tz-form-group"><label>合同金额 (万元)</label><input type="number" name="revenue" class="form-control" value="' . $vNum('revenue') . '" step="0.01" min="0" placeholder="0.00"><div class="tz-form-tip">用于计算预估利润率：(合同金额-当前预估成本-外采金额)÷合同金额×100%</div></div>';
+$formHTML .= '<div class="tz-form-group"><label>外采金额 (万元)</label><input type="number" name="outsourcingAmount" class="form-control" value="' . $vNum('outsourcingAmount') . '" step="0.01" min="0" placeholder="0.00"></div>';
+$formHTML .= '</div>';
+$formHTML .= '<div class="tz-form-row">';
+$formHTML .= '<div class="tz-form-group"><label>回款金额 (万元)</label><input type="number" name="receivedAmount" class="form-control" value="' . $vNum('receivedAmount') . '" step="0.01" min="0" placeholder="0.00"></div>';
 $formHTML .= '<div class="tz-form-group"><label>排列顺序</label><input type="number" name="sortOrder" class="form-control" value="' . $vNum('sortOrder', 0) . '" step="1" min="0" placeholder="0"><div class="tz-form-tip">数字越小越靠前</div></div>';
 $formHTML .= '</div>';
 
+/* 进度偏差说明 + 备注 */
 $formHTML .= '<div class="tz-form-group">';
-$formHTML .= '<label>近期项目成员</label>';
-$formHTML .= '<input type="text" name="recentMembers" class="form-control" value="' . $v('recentMembers') . '" placeholder="例如：张三、李四、王五（手动填写）">';
+$formHTML .= '<label>进度偏差说明</label>';
+$formHTML .= '<textarea name="progressDeviation" id="progressDeviation" class="form-control" rows="3" placeholder="计划与实际进度有偏差时的说明">' . $v('progressDeviation') . '</textarea>';
 $formHTML .= '</div>';
+$formHTML .= '<div class="tz-form-group">';
+$formHTML .= '<label>备注</label>';
+$formHTML .= '<textarea name="remark" id="remark" class="form-control" rows="3">' . $v('remark') . '</textarea>';
+$formHTML .= '</div>';
+
+/* 近期项目成员在列表页由项目团队成员自动汇总展示，编辑表单无需手动填写 */
 
 /* 按钮区 */
 $formHTML .= '<div class="tz-form-actions">';

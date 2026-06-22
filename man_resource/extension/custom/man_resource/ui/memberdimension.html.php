@@ -38,7 +38,7 @@ if(common::hasPriv('man_resource', 'memberdimension'))  $navItems[] = array('tex
 featureBar
 (
     set::current($status),
-    set::linkParams("userID={$userID}&status={key}&begin={$begin}&end={$end}"),
+    set::linkParams("userID={$userID}&status={key}&begin=" . str_replace('-', '_', $begin) . "&end=" . str_replace('-', '_', $end) . "&showHoliday={$showHoliday}&execution={$execution}&projectID={$projectID}"),
     to::item($navItems)
 );
 
@@ -91,6 +91,12 @@ panel
                 setClass('form-group'),
                 h::label($lang->man_resource->user),
                 div(setClass('picker-box'), picker(set::name('userID'), set::items($userList), set::value($userID)))
+            ),
+            div
+            (
+                setClass('form-group'),
+                h::label($lang->man_resource->projectCol),
+                div(setClass('picker-box'), picker(set::name('projectID'), set::items($projectList), set::value($projectID), set::placeholder($lang->all)))
             ),
             div
             (
@@ -175,7 +181,7 @@ if(!empty($taskList))
             'status'        => zget($statusList, $task->status, $task->status),
             'left'          => $task->left,
             'consumed'      => $task->consumed,
-            'deadline'      => ($task->deadline && $task->deadline != '0000-00-00') ? $task->deadline : ''
+            'deadline'      => $status == 'done' ? substr((string)$task->finishedDate, 0, 10) : (($task->deadline && $task->deadline != '0000-00-00') ? $task->deadline : '')
         );
     }
 }
@@ -195,11 +201,53 @@ panel
             array('name' => 'status',        'title' => $lang->man_resource->taskStatusCol,    'width' => '90px'),
             array('name' => 'consumed',      'title' => $lang->man_resource->consumeHoursCol,  'width' => '100px', 'sortType' => true),
             array('name' => 'left',          'title' => $lang->man_resource->totalEstimatedHoursCol, 'width' => '110px', 'sortType' => true),
-            array('name' => 'deadline',      'title' => $lang->man_resource->deadlineCol,      'width' => '120px', 'sortType' => true)
+            array('name' => 'deadline',      'title' => $status == 'done' ? $lang->man_resource->finishedDateCol : $lang->man_resource->deadlineCol, 'width' => '120px', 'sortType' => true)
         )),
         set::data($taskRows),
         set::footPager(usePager()),
         set::emptyTip($lang->man_resource->memberTaskEmpty)
+    )
+);
+
+/* Work item panel. */
+$itemRows = array();
+if(!empty($workItemList))
+{
+    foreach($workItemList as $item)
+    {
+        $itemRows[] = array(
+            'id'        => $item['type'] . '-' . $item['id'],
+            'typeName'  => $item['typeName'],
+            'name'      => !empty($item['url']) ? html::a($item['url'], htmlspecialchars((string)$item['name'])) : htmlspecialchars((string)$item['name']),
+            'status'    => $item['status'],
+            'project'   => $item['project'],
+            'execution' => $item['execution'],
+            'date'      => $item['date'],
+            'hours'     => $item['hours']
+        );
+    }
+}
+
+panel
+(
+    set::title($status == 'done' ? $lang->man_resource->doneItem : $lang->man_resource->waitItem),
+    setClass('mt-4'),
+    dtable
+    (
+        setID('memberWorkItemList'),
+        set::cols(array
+        (
+            array('name' => 'typeName',  'title' => $lang->man_resource->itemTypeCol,      'width' => '90px'),
+            array('name' => 'name',      'title' => $lang->man_resource->itemNameCol,      'width' => '260px', 'html' => true),
+            array('name' => 'status',    'title' => $lang->man_resource->taskStatusCol,    'width' => '90px'),
+            array('name' => 'project',   'title' => $lang->man_resource->projectNameCol,   'width' => '160px'),
+            array('name' => 'execution', 'title' => $lang->man_resource->executionNameCol, 'width' => '160px'),
+            array('name' => 'date',      'title' => $lang->man_resource->deadlineCol,      'width' => '120px', 'sortType' => true),
+            array('name' => 'hours',     'title' => $status == 'done' ? $lang->man_resource->consumeHoursCol : $lang->man_resource->estimatedHoursCol, 'width' => '120px', 'sortType' => true)
+        )),
+        set::data($itemRows),
+        set::footPager(usePager()),
+        set::emptyTip($lang->man_resource->memberWorkItemEmpty)
     )
 );
 

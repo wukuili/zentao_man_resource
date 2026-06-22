@@ -19,12 +19,11 @@ $config->crmsync->defaultDurationMonths = 6;
 
 /*
  * 对外接口令牌表: token => 操作者账号。
- * CRM 调用 receive/products 时带 X-Resource-Token 头或 ?token= 参数命中即放行,
- * 命中后以对应账号身份建项目(动态记录的 openedBy)。请在"对接设置"页或此处配置强随机 token。
+ * 令牌通过禅道"对接设置"页维护，保存后写入 zt_config，由框架在运行时注入 $config->crmsync->apiTokens。
+ * 必须初始化为 stdclass(而非 array): config.php 先于 DB 配置加载, 框架 mergeConfig 仅在
+ * section 为对象(is_object)时才会注入令牌, 若此处预置为 array() 则 DB 令牌会被静默丢弃(导致 401)。
  */
-$config->crmsync->apiTokens = array(
-    // 'please-rotate-this-token' => 'admin',
-);
+if(!isset($config->crmsync->apiTokens)) $config->crmsync->apiTokens = new stdclass();
 
 /* 数据表常量。 */
 $dbPrefix = (isset($config->db) && isset($config->db->prefix)) ? $config->db->prefix : 'zt_';

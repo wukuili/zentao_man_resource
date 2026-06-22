@@ -33,6 +33,225 @@ class crmsyncModel extends model
     }
 
     /**
+     * 对外: 获取可供 CRM "关联现有项目"选择的项目列表。
+     *
+     * parent 为所属项目集ID(0=顶层), 供 CRM 侧按项目集级联过滤。
+     *
+     * @access public
+     * @return array  [{id, name, code, status, PM, begin, end, parent}]
+     */
+    public function getZentaoProjects(): array
+    {
+        $projects = $this->dao->select('id,name,code,status,PM,begin,end,parent')->from(TABLE_PROJECT)
+            ->where('deleted')->eq('0')
+            ->andWhere('type')->eq('project')
+            ->orderBy('id_desc')
+            ->fetchAll('id');
+
+        $list = array();
+        foreach($projects as $project)
+        {
+            $list[] = array(
+                'id'     => (int)$project->id,
+                'name'   => $project->name,
+                'code'   => $project->code,
+                'status' => $project->status,
+                'PM'     => $project->PM,
+                'begin'  => $project->begin,
+                'end'    => $project->end,
+                'parent' => (int)$project->parent,
+            );
+        }
+        return $list;
+    }
+
+    /**
+     * 对外: 获取可供 CRM "关联现有项目集"选择的项目集列表。
+     *
+     * @access public
+     * @return array  [{id, name, parent, grade, status, budget, begin, end}]
+     */
+    public function getZentaoPrograms(): array
+    {
+        $programs = $this->dao->select('id,name,parent,grade,status,budget,begin,end')->from(TABLE_PROGRAM)
+            ->where('deleted')->eq('0')
+            ->andWhere('type')->eq('program')
+            ->andWhere('status')->ne('closed')
+            ->orderBy('grade,`order`')
+            ->fetchAll('id');
+
+        $list = array();
+        foreach($programs as $program)
+        {
+            $list[] = array(
+                'id'     => (int)$program->id,
+                'name'   => $program->name,
+                'parent' => (int)$program->parent,
+                'grade'  => (int)$program->grade,
+                'status' => $program->status,
+                'budget' => (float)$program->budget,
+                'begin'  => $program->begin,
+                'end'    => $program->end,
+            );
+        }
+        return $list;
+    }
+
+    /**
+     * 按ID查询未删除的项目集。
+     *
+     * @param  int $programID
+     * @access public
+     * @return object|false
+     */
+    public function getProgramById(int $programID)
+    {
+        return $this->dao->select('*')->from(TABLE_PROGRAM)
+            ->where('id')->eq($programID)
+            ->andWhere('type')->eq('program')
+            ->andWhere('deleted')->eq('0')
+            ->fetch();
+    }
+
+    /**
+     * 按ID查询未删除的项目。
+     *
+     * @param  int $projectID
+     * @access public
+     * @return object|false
+     */
+    public function getProjectById(int $projectID)
+    {
+        return $this->dao->select('*')->from(TABLE_PROJECT)
+            ->where('id')->eq($projectID)
+            ->andWhere('type')->eq('project')
+            ->andWhere('deleted')->eq('0')
+            ->fetch();
+    }
+
+    /**
+     * 把商机金额刷新到禅道项目: 合同金额 → 项目预算, 并以动态留痕(含回款金额)。
+     *
+     * 禅道项目没有"回款金额"原生字段, 故回款金额仅记入项目动态备注;
+     * 原始数值同时保存在 zt_crmsync_map.payload, 可追溯。
+     *
+     * @param  int    $projectID
+     * @param  object $opp      规整后的商机对象
+     * @param  bool   $isLink   true=关联现有项目场景, 仅影响动态文案
+     * @access public
+     * @return void
+     */
+    public function syncAmountsToProject(int $projectID, object $opp, bool $isLink = false): void
+    {
+        $data = new stdclass();
+        if($opp->contractAmount > 0)
+        {
+            $data->budget     = round($opp->contractAmount, 2);
+            $data->budgetUnit = 'CNY';
+        }
+        $data->market         = (int)$opp->opportunityId;
+        $data->lastEditedBy   = $this->app->user->account;
+        $data->lastEditedDate = helper::now();
+        $this->dao->update(TABLE_PROJECT)->data($data)->where('id')->eq($projectID)->exec();
+
+        $parts   = array();
+        $parts[] = ($isLink ? '关联' : '同步') . 'CRM商机#' . $opp->opportunityId . ($opp->name !== '' ? '(' . $opp->name . ')' : '');
+        if($opp->customerName !== '') $parts[] = '客户: ' . $opp->customerName;
+        if($opp->contractAmount > 0)      $parts[] = '合同金额: ' . round($opp->contractAmount, 2) . ' 元(已写入项目预算)';
+        elseif($opp->estimatedAmount > 0) $parts[] = '预计金额: ' . round($opp->estimatedAmount, 2) . ' 元(合同金额为空, 已写入台账合同金额)';
+        if($opp->receivedAmount > 0)  $parts[] = '回款金额: ' . round($opp->receivedAmount, 2) . ' 元';
+        $comment = htmlspecialchars(implode('；', $parts), ENT_QUOTES, 'UTF-8');
+        $this->loadModel('action')->create('project', $projectID, 'commented', $comment);
+
+        $this->syncToTaizhang($projectID, $opp);
+    }
+
+    /**
+     * 把商机金额刷新到禅道项目集: 合同金额 → 项目集预算, 并以动态留痕(含回款金额)。
+     *
+     * 设计约定: 项目集型商机的金额只写项目集预算, 不向其下子项目分摊(分摊由禅道侧项目经理决策);
+     * 台账(zt_taizhang)按项目维度记账, 项目集不写台账。
+     *
+     * @param  int    $programID
+     * @param  object $opp      规整后的商机对象
+     * @param  bool   $isLink   true=关联现有项目集场景, 仅影响动态文案
+     * @access public
+     * @return void
+     */
+    public function syncAmountsToProgram(int $programID, object $opp, bool $isLink = false): void
+    {
+        $data = new stdclass();
+        if($opp->contractAmount > 0)
+        {
+            $data->budget     = round($opp->contractAmount, 2);
+            $data->budgetUnit = 'CNY';
+        }
+        $data->market         = (int)$opp->opportunityId;
+        $data->lastEditedBy   = $this->app->user->account;
+        $data->lastEditedDate = helper::now();
+        $this->dao->update(TABLE_PROGRAM)->data($data)->where('id')->eq($programID)->exec();
+
+        $parts   = array();
+        $parts[] = ($isLink ? '关联' : '同步') . 'CRM商机#' . $opp->opportunityId . ($opp->name !== '' ? '(' . $opp->name . ')' : '');
+        if($opp->customerName !== '') $parts[] = '客户: ' . $opp->customerName;
+        if($opp->contractAmount > 0)  $parts[] = '合同金额: ' . round($opp->contractAmount, 2) . ' 元(已写入项目集预算, 子项目预算请在禅道内分配)';
+        if($opp->receivedAmount > 0)  $parts[] = '回款金额: ' . round($opp->receivedAmount, 2) . ' 元';
+        $comment = htmlspecialchars(implode('；', $parts), ENT_QUOTES, 'UTF-8');
+        $this->loadModel('action')->create('program', $programID, 'commented', $comment);
+    }
+
+    /**
+     * 把商机金额写入二开「项目台账」(zt_taizhang, 按 projectID 唯一)。
+     *
+     * CRM 金额单位为元, 台账为万元(除以 10000);
+     * 合同金额 → revenue(合同金额为空时回退用预计金额), 回款金额 → receivedAmount;
+     * CRM 未填(<=0)的金额不覆盖台账中人工维护的既有值;
+     * 台账插件未安装(无表)或写入失败时静默跳过, 不阻断同步主流程。
+     *
+     * @param  int    $projectID
+     * @param  object $opp       规整后的商机对象
+     * @access public
+     * @return void
+     */
+    public function syncToTaizhang(int $projectID, object $opp): void
+    {
+        if($projectID <= 0) return;
+        try
+        {
+            if(!$this->dao->query("SHOW TABLES LIKE 'zt_taizhang'")->fetch()) return;
+
+            $amount   = $opp->contractAmount > 0 ? $opp->contractAmount : $opp->estimatedAmount;
+            $revenue  = $amount > 0 ? round($amount / 10000, 2) : 0;
+            $received = $opp->receivedAmount > 0 ? round($opp->receivedAmount / 10000, 2) : 0;
+
+            $row = $this->dao->select('id')->from('zt_taizhang')->where('projectID')->eq($projectID)->fetch();
+            $now = helper::now();
+
+            $data = new stdclass();
+            if($revenue  > 0) $data->revenue        = $revenue;
+            if($received > 0) $data->receivedAmount = $received;
+            $data->updatedAt = $now;
+
+            if($row)
+            {
+                $this->dao->update('zt_taizhang')->data($data)->where('id')->eq($row->id)->exec();
+            }
+            else
+            {
+                $data->projectID = $projectID;
+                $data->shortName = mb_substr($opp->name, 0, 100);
+                $data->createdAt = $now;
+                $data->deleted   = 0;
+                $this->dao->insert('zt_taizhang')->data($data)->exec();
+            }
+        }
+        catch(Exception $e)
+        {
+            /* 台账同步失败不影响项目同步结果。 */
+        }
+    }
+
+    /**
      * 按 CRM 商机ID 查询映射记录。
      *
      * @param  string $opportunityId
@@ -77,7 +296,9 @@ class crmsyncModel extends model
         $opp->customerName  = trim((string)(zget($input, 'customerName', '')));
         $opp->closeReason   = trim((string)(zget($input, 'closeReason', '')));
         $opp->ownerName     = trim((string)(zget($input, 'ownerName', '')));
-        $opp->contractAmount = (float)(zget($input, 'contractAmount', 0));
+        $opp->contractAmount  = (float)(zget($input, 'contractAmount', 0));
+        $opp->estimatedAmount = (float)(zget($input, 'estimatedAmount', 0));
+        $opp->receivedAmount  = (float)(zget($input, 'receivedAmount', 0));
         $opp->contractDate  = $this->normalizeDate((string)(zget($input, 'contractDate', '')));
         $opp->closeTime     = (string)(zget($input, 'closeTime', ''));
         return $opp;
@@ -193,22 +414,70 @@ class crmsyncModel extends model
     }
 
     /**
+     * 核心: 由商机数据创建一个项目集(顶层)。
+     *
+     * 复用禅道原生 programModel::create(), 以保证树路径(path/grade)/白名单/权限视图初始化与手工建项目集一致。
+     * 项目集下的子项目由禅道侧后续创建或由 CRM 二期关联, 此处不建子项目。
+     *
+     * @param  object $opp          规整后的商机对象
+     * @param  string $programName  项目集名称; 空串则用商机名
+     * @access public
+     * @return int|false            成功返回 programID, 失败返回 false (dao::getError() 可取错误)
+     */
+    public function createProgramFromOpportunity(object $opp, string $programName = '')
+    {
+        $this->loadModel('program');
+
+        $config = $this->config->crmsync;
+
+        $program = new stdclass();
+        $program->name           = $programName !== '' ? $programName : $opp->name;
+        $program->type           = 'program';
+        $program->parent         = 0;
+        $program->status         = 'wait';
+        $program->begin          = helper::today();
+        $program->end            = $opp->contractDate ? $opp->contractDate : date('Y-m-d', strtotime('+' . (int)zget($config, 'defaultDurationMonths', 6) . ' months'));
+        $program->days           = 0;
+        $program->PM             = zget($config, 'defaultPM', 'admin');
+        $program->acl            = 'open';
+        $program->whitelist      = '';
+        $program->budget         = $opp->contractAmount > 0 ? round($opp->contractAmount, 2) : 0;
+        $program->budgetUnit     = 'CNY';
+        $program->market         = (int)$opp->opportunityId;
+        $program->desc           = $this->buildDesc($opp);
+        $program->openedBy       = $this->app->user->account;
+        $program->openedDate     = helper::now();
+        $program->lastEditedBy   = $this->app->user->account;
+        $program->lastEditedDate = helper::now();
+
+        $programID = $this->program->create($program);
+        if(!$programID || dao::isError()) return false;
+
+        /* 记录动态。 */
+        $this->loadModel('action')->create('program', (int)$programID, 'opened');
+
+        return (int)$programID;
+    }
+
+    /**
      * 写入/更新一条同步映射记录。
      *
      * @param  object $opp
-     * @param  int    $projectID
+     * @param  int    $projectID  禅道目标ID(项目ID 或 项目集ID, 由 targetType 区分)
      * @param  int    $productId
      * @param  string $status     success|failed
      * @param  string $errorMsg
      * @param  string $payload    原始JSON
+     * @param  string $targetType project|program
      * @access public
      * @return void
      */
-    public function saveMap(object $opp, int $projectID, int $productId, string $status, string $errorMsg = '', string $payload = ''): void
+    public function saveMap(object $opp, int $projectID, int $productId, string $status, string $errorMsg = '', string $payload = '', string $targetType = 'project'): void
     {
         $data = new stdclass();
         $data->opportunityId = $opp->opportunityId;
         $data->projectID     = $projectID;
+        $data->targetType    = $targetType === 'program' ? 'program' : 'project';
         $data->productId     = $productId;
         $data->customerName  = $opp->customerName;
         $data->oppName       = $opp->name;
@@ -242,6 +511,7 @@ class crmsyncModel extends model
         $parts[] = '来源CRM商机#' . $opp->opportunityId;
         if($opp->customerName !== '') $parts[] = '客户: ' . $opp->customerName;
         if($opp->contractAmount > 0)  $parts[] = '合同金额: ' . $opp->contractAmount;
+        if($opp->receivedAmount > 0)  $parts[] = '回款金额: ' . $opp->receivedAmount;
         if($opp->closeReason !== '')  $parts[] = '赢单说明: ' . $opp->closeReason;
         return htmlspecialchars(implode('；', $parts), ENT_QUOTES, 'UTF-8');
     }

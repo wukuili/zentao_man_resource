@@ -12,34 +12,40 @@ namespace zin;
 
 $entries      = $this->view->entries;
 $summary      = $this->view->summary;
+$totalSummary = $this->view->totalSummary;
 $phase        = $this->view->phase;
 $pm           = $this->view->pm;
-$rdManager    = $this->view->rdManager;
+$projectStatus = $this->view->projectStatus;
+$category     = $this->view->category;
 $phaseOptions = $this->view->phaseOptions;
+$statusOptions = $this->view->statusOptions;
+$categoryOptions = $this->view->categoryOptions;
 $pmOptions    = $this->view->pmOptions;
-$rdOptions    = $this->view->rdOptions;
+$pageID       = (int)$this->view->pageID;
+$pageTotal    = (int)$this->view->pageTotal;
+$recPerPage   = (int)$this->view->recPerPage;
+$total        = (int)$this->view->total;
 $browseURL    = $this->view->browseURL;
 $warnRate     = (float)$this->view->warnRate;
 $dangerRate   = (float)$this->view->dangerRate;
 
-$editBase   = helper::createLink('taizhang', 'edit', 'id=');
-$deleteBase = helper::createLink('taizhang', 'delete', 'id=');
-$exportURL  = helper::createLink('taizhang', 'export', "phase={$phase}&pm={$pm}&rdManager={$rdManager}");
+$addURL     = helper::createLink('taizhang', 'edit', 'id=0');
+$exportURL  = helper::createLink('taizhang', 'export', "phase={$phase}&pm={$pm}&projectStatus={$projectStatus}&category={$category}");
 
 /* 把语言串和 URL 传给 JS */
 jsVar('tzBrowseURL',       $browseURL);
 jsVar('tzLang',            array('confirmDelete' => $lang->taizhang->confirmDelete));
-jsVar('tzDeleteBaseURL',   $deleteBase);
 
 css(<<<CSS
 /* 覆盖 ZenTao body 内边距，让表格更宽 */
 .taizhang-page .panel-body { padding: 0 !important; }
+.taizhang-page { overflow-x: auto; }
 CSS);
 
 /* ── 工具栏 ── */
 toolbar
 (
-    item(set::text($lang->taizhang->addEntry),   set::icon('plus'),   set::type('primary'), set::url($editBase . '0')),
+    item(set::text($lang->taizhang->addEntry),   set::icon('plus'),   set::type('primary'), set::url($addURL)),
     item(set::text($lang->taizhang->exportEntry), set::icon('export'), set::type('ghost'),   set::url($exportURL)),
 );
 
@@ -54,33 +60,92 @@ $buildSelect = function($id, $name, $options, $current) {
     return $html;
 };
 
+/* 文本/日期类字段为空时显示占位符 */
+$fmtPlain = function($val) {
+    $val = (string)$val;
+    return ($val !== '') ? htmlspecialchars($val) : '<span class="tz-na">-</span>';
+};
+
+/* 分包合同状态/开工资料是否齐全/安保措施是否到位/是否涉及危险作业仅施工类、集成类项目适用，
+ * 软件类项目统一显示 "-"（与编辑表单中这几项仅施工/集成类可见保持一致） */
+$fmtConstructionOnly = function($val, $category) use ($fmtPlain) {
+    if($category === '软件类') return '<span class="tz-na">-</span>';
+    return $fmtPlain($val);
+};
+
 /* 筛选区 HTML */
 $filterHTML  = '<div class="tz-filter-bar">';
 $filterHTML .= '<label>项目阶段</label>' . $buildSelect('tzFilterPhase', 'phase', $phaseOptions, $phase);
+$filterHTML .= '<label style="margin-left:10px">项目类别</label>' . $buildSelect('tzFilterCategory', 'category', $categoryOptions, $category);
 $filterHTML .= '<label style="margin-left:10px">项目经理</label>' . $buildSelect('tzFilterPM', 'pm', $pmOptions, $pm);
-$filterHTML .= '<label style="margin-left:10px">研发经理</label>' . $buildSelect('tzFilterRD', 'rdManager', $rdOptions, $rdManager);
+$filterHTML .= '<label style="margin-left:10px">项目状态</label>' . $buildSelect('tzFilterStatus', 'projectStatus', $statusOptions, $projectStatus);
 $filterHTML .= '<div class="tz-filter-actions">';
 $filterHTML .= '<button type="button" class="btn btn-primary btn-sm" onclick="tzSubmitFilter()" style="font-size:13px">查询</button>';
 $filterHTML .= '<button type="button" class="btn btn-default btn-sm" onclick="tzResetFilter()" style="font-size:13px">重置</button>';
 $filterHTML .= '</div></div>';
+
+/* 统计区 HTML（汇总当前筛选条件下的全部数据，不受分页影响） */
+$statCard = function($label, $value, $extraClass = '') {
+    return '<div class="tz-stat-card ' . $extraClass . '"><div class="tz-stat-label">' . htmlspecialchars($label) . '</div><div class="tz-stat-value">' . $value . '</div></div>';
+};
+$tsProfitDisplay = ($totalSummary['profitRate'] !== null) ? $totalSummary['profitRate'] . '%' : $lang->taizhang->profitRateNA;
+$tsProfitClass   = '';
+if($totalSummary['profitRate'] === null || $totalSummary['profitRate'] <= $dangerRate) $tsProfitClass = 'tz-stat-danger';
+elseif($totalSummary['profitRate'] < $warnRate) $tsProfitClass = 'tz-stat-warn';
+
+$statsHTML  = '<div class="tz-stats-bar">';
+$statsHTML .= $statCard('项目总数', $total);
+$statsHTML .= $statCard('初始预估人天', $totalSummary['initEstHours']);
+$statsHTML .= $statCard('初始预估成本(万元)', $totalSummary['initBudget']);
+$statsHTML .= $statCard('已投入人天', $totalSummary['investedHours']);
+$statsHTML .= $statCard('已投入成本(万元)', $totalSummary['investedCost']);
+$statsHTML .= $statCard('当前预估人天', $totalSummary['currentEstHours']);
+$statsHTML .= $statCard('当前预估成本(万元)', $totalSummary['currentBudget']);
+$statsHTML .= $statCard('合同金额(万元)', $totalSummary['revenue']);
+$statsHTML .= $statCard('外采金额(万元)', $totalSummary['outsourcingAmount']);
+$statsHTML .= $statCard('回款金额(万元)', $totalSummary['receivedAmount']);
+$statsHTML .= $statCard('整体预估利润率', $tsProfitDisplay, $tsProfitClass);
+$statsHTML .= '</div>';
 
 /* 表头 */
 $thStyle = '';
 $tableHTML  = '<div class="tz-table-wrap"><table class="tz-table">';
 $tableHTML .= '<thead><tr>';
 $tableHTML .= '<th style="width:44px">序号</th>';
+$tableHTML .= '<th style="min-width:90px">项目集</th>';
 $tableHTML .= '<th style="min-width:90px">项目简称</th>';
 $tableHTML .= '<th style="width:80px">项目阶段</th>';
+$tableHTML .= '<th style="width:80px">项目类别</th>';
 $tableHTML .= '<th style="width:72px">项目经理</th>';
-$tableHTML .= '<th style="width:72px">研发经理</th>';
+$tableHTML .= '<th style="width:72px">项目状态</th>';
 $tableHTML .= '<th style="min-width:220px">当前项目情况</th>';
-$tableHTML .= '<th style="width:70px">初始预估<br>人月</th>';
+$tableHTML .= '<th style="min-width:160px">项目简介</th>';
+$tableHTML .= '<th style="width:90px">合同签署<br>时间</th>';
+$tableHTML .= '<th style="width:90px">分包合同<br>状态</th>';
+$tableHTML .= '<th style="width:90px">工程状态</th>';
+$tableHTML .= '<th style="width:90px">采购方式</th>';
+$tableHTML .= '<th style="min-width:100px">供货单位</th>';
+$tableHTML .= '<th style="min-width:100px">安装/施工<br>单位</th>';
+$tableHTML .= '<th style="width:90px">计划开工<br>日期</th>';
+$tableHTML .= '<th style="width:90px">实际开工<br>日期</th>';
+$tableHTML .= '<th style="width:90px">计划完工<br>日期</th>';
+$tableHTML .= '<th style="width:90px">实际完工<br>日期</th>';
+$tableHTML .= '<th style="min-width:100px">验收情况</th>';
+$tableHTML .= '<th style="width:90px">安保措施<br>是否到位</th>';
+$tableHTML .= '<th style="width:90px">是否涉及<br>危险作业</th>';
+$tableHTML .= '<th style="width:90px">开工资料<br>是否齐全</th>';
+$tableHTML .= '<th style="width:70px">初始预估<br>人天</th>';
 $tableHTML .= '<th style="width:85px">初始预估成本<br>(万元)</th>';
-$tableHTML .= '<th style="width:70px">已投入<br>人月</th>';
-$tableHTML .= '<th style="width:100px">已投入成本<br>(除外购和税)</th>';
-$tableHTML .= '<th style="width:70px">当前预估<br>人月</th>';
+$tableHTML .= '<th style="width:70px">已投入<br>人天</th>';
+$tableHTML .= '<th style="width:100px">已投入成本<br>(除外购和税/万元)</th>';
+$tableHTML .= '<th style="width:70px">当前预估<br>人天</th>';
 $tableHTML .= '<th style="width:85px">当前预估成本<br>(万元)</th>';
+$tableHTML .= '<th style="width:85px">合同金额<br>(万元)</th>';
+$tableHTML .= '<th style="width:85px">外采金额<br>(万元)</th>';
+$tableHTML .= '<th style="width:85px">回款金额<br>(万元)</th>';
 $tableHTML .= '<th style="width:80px">当前预估<br>利润率(%)</th>';
+$tableHTML .= '<th style="min-width:140px">进度偏差说明</th>';
+$tableHTML .= '<th style="min-width:120px">备注</th>';
 $tableHTML .= '<th style="min-width:160px">近期项目成员</th>';
 $tableHTML .= '<th style="width:84px">操作</th>';
 $tableHTML .= '</tr></thead>';
@@ -89,17 +154,42 @@ $tableHTML .= '</tr></thead>';
 $tableHTML .= '<tbody>';
 if(empty($entries))
 {
-    $tableHTML .= '<tr><td colspan="15" class="tz-empty">' . htmlspecialchars($lang->taizhang->noData) . '</td></tr>';
+    $tableHTML .= '<tr><td colspan="37" class="tz-empty">' . htmlspecialchars($lang->taizhang->noData) . '</td></tr>';
 }
 else
 {
-    $i = 1;
+    /* 项目集列纵向合并：统计本页内同项目集连续行数（entries 已在模型层按项目集排序） */
+    $groupSpans = array();
+    $prevKey = null;
+    $anchor  = 0;
+    $idx     = 0;
+    foreach($entries as $entry)
+    {
+        $key = (string)$entry->programName;
+        if($key !== $prevKey)
+        {
+            $anchor = $idx;
+            $groupSpans[$anchor] = 1;
+            $prevKey = $key;
+        }
+        else
+        {
+            $groupSpans[$anchor]++;
+        }
+        $idx++;
+    }
+
+    $i   = 1;
+    $idx = 0;
     foreach($entries as $entry)
     {
         $profitRate      = $entry->profitRate;
         $investedCost    = (float)$entry->investedCost;
         $initBudget      = (float)$entry->initBudget;
         $currentBudget   = (float)$entry->currentBudget;
+        $revenue         = (float)$entry->revenue;
+        $outsourcing     = (float)$entry->outsourcingAmount;
+        $received        = (float)$entry->receivedAmount;
 
         /* 利润率单元格样式 */
         $profitClass = 'td-num';
@@ -123,23 +213,50 @@ else
 
         $profitDisplay = ($profitRate !== null) ? $profitRate : $lang->taizhang->profitRateNA;
 
-        $editURL   = $editBase   . $entry->id;
-        $deleteURL = $deleteBase . $entry->id;
+        $editURL   = helper::createLink('taizhang', 'edit',   "id={$entry->id}");
+        $deleteURL = helper::createLink('taizhang', 'delete', "id={$entry->id}");
 
-        $tableHTML .= '<tr>';
+        $isGroupStart = isset($groupSpans[$idx]);
+        $tableHTML .= '<tr' . ($isGroupStart ? ' class="tz-group-start"' : '') . '>';
         $tableHTML .= '<td class="td-center td-serial">' . $i++ . '</td>';
+        if($isGroupStart)
+        {
+            $tableHTML .= '<td class="td-program" rowspan="' . $groupSpans[$idx] . '">' . ($entry->programName !== '' ? htmlspecialchars($entry->programName) : '<span class="tz-na">-</span>') . '</td>';
+        }
+        $idx++;
         $tableHTML .= '<td>' . htmlspecialchars($entry->shortName ?: $entry->projectName) . '</td>';
         $tableHTML .= '<td class="td-center">' . htmlspecialchars($entry->phase) . '</td>';
+        $tableHTML .= '<td class="td-center">' . $fmtPlain($entry->projectCategory) . '</td>';
         $tableHTML .= '<td class="td-center">' . htmlspecialchars($entry->pmName) . '</td>';
-        $tableHTML .= '<td class="td-center">' . htmlspecialchars($entry->rdManagerName) . '</td>';
+        $tableHTML .= '<td class="td-center">' . htmlspecialchars($entry->projectStatusName) . '</td>';
         $tableHTML .= '<td class="td-status">' . nl2br(htmlspecialchars($entry->currentStatus)) . '</td>';
+        $tableHTML .= '<td class="td-status">' . nl2br($fmtPlain($entry->projectIntro)) . '</td>';
+        $tableHTML .= '<td class="td-center">' . $fmtPlain($entry->contractSignDate) . '</td>';
+        $tableHTML .= '<td class="td-center">' . $fmtConstructionOnly($entry->subcontractStatus, $entry->projectCategory) . '</td>';
+        $tableHTML .= '<td class="td-center">' . $fmtPlain($entry->engineeringStatus) . '</td>';
+        $tableHTML .= '<td class="td-center">' . $fmtPlain($entry->procurementMethod) . '</td>';
+        $tableHTML .= '<td>' . $fmtPlain($entry->supplyUnit) . '</td>';
+        $tableHTML .= '<td>' . $fmtPlain($entry->constructionUnit) . '</td>';
+        $tableHTML .= '<td class="td-center">' . $fmtPlain($entry->planStartDate) . '</td>';
+        $tableHTML .= '<td class="td-center">' . $fmtPlain($entry->actualStartDate) . '</td>';
+        $tableHTML .= '<td class="td-center">' . $fmtPlain($entry->planEndDate) . '</td>';
+        $tableHTML .= '<td class="td-center">' . $fmtPlain($entry->actualEndDate) . '</td>';
+        $tableHTML .= '<td>' . $fmtPlain($entry->acceptanceStatus) . '</td>';
+        $tableHTML .= '<td class="td-center">' . $fmtConstructionOnly($entry->securityMeasures, $entry->projectCategory) . '</td>';
+        $tableHTML .= '<td class="td-center">' . $fmtConstructionOnly($entry->hazardousWork, $entry->projectCategory) . '</td>';
+        $tableHTML .= '<td class="td-center">' . $fmtConstructionOnly($entry->startDocsComplete, $entry->projectCategory) . '</td>';
         $tableHTML .= '<td class="td-num">' . $entry->initEstHours . '</td>';
         $tableHTML .= '<td class="td-num">' . $entry->initBudget . '</td>';
         $tableHTML .= '<td class="td-num">' . $entry->investedHours . '</td>';
         $tableHTML .= '<td class="' . $investedClass . '">' . $investedCost . '</td>';
         $tableHTML .= '<td class="td-num">' . $entry->currentEstHours . '</td>';
         $tableHTML .= '<td class="td-num">' . $currentBudget . '</td>';
+        $tableHTML .= '<td class="td-num">' . $revenue . '</td>';
+        $tableHTML .= '<td class="td-num">' . $outsourcing . '</td>';
+        $tableHTML .= '<td class="td-num">' . $received . '</td>';
         $tableHTML .= '<td class="' . $profitClass . '">' . $profitDisplay . '</td>';
+        $tableHTML .= '<td class="td-status">' . nl2br($fmtPlain($entry->progressDeviation)) . '</td>';
+        $tableHTML .= '<td class="td-status">' . nl2br($fmtPlain($entry->remark)) . '</td>';
         $tableHTML .= '<td class="td-members">' . htmlspecialchars($entry->recentMembers) . '</td>';
         $tableHTML .= '<td class="td-center"><div class="tz-actions">';
         $tableHTML .= '<a href="' . $editURL . '" class="text-primary">编辑</a>';
@@ -158,25 +275,70 @@ if(!empty($entries))
     if($summary['profitRate'] !== null && $summary['profitRate'] < $warnRate) $sProfitClass .= ' tz-warn';
 
     $tableHTML .= '<tfoot><tr>';
-    $tableHTML .= '<td colspan="6" class="td-center"><strong>合计</strong></td>';
+    $tableHTML .= '<td colspan="23" class="td-center"><strong>合计</strong></td>';
     $tableHTML .= '<td class="td-right">' . $summary['initEstHours'] . '</td>';
     $tableHTML .= '<td class="td-right">' . $summary['initBudget'] . '</td>';
     $tableHTML .= '<td class="td-right">' . $summary['investedHours'] . '</td>';
     $tableHTML .= '<td class="td-right">' . $summary['investedCost'] . '</td>';
     $tableHTML .= '<td class="td-right">' . $summary['currentEstHours'] . '</td>';
     $tableHTML .= '<td class="td-right">' . $summary['currentBudget'] . '</td>';
+    $tableHTML .= '<td class="td-right">' . $summary['revenue'] . '</td>';
+    $tableHTML .= '<td class="td-right">' . $summary['outsourcingAmount'] . '</td>';
+    $tableHTML .= '<td class="td-right">' . $summary['receivedAmount'] . '</td>';
     $tableHTML .= '<td class="' . $sProfitClass . '">' . $sProfitDisplay . '</td>';
-    $tableHTML .= '<td></td><td></td>';
+    $tableHTML .= '<td></td><td></td><td></td><td></td>';
     $tableHTML .= '</tr></tfoot>';
 }
 
 $tableHTML .= '</table></div>';
 
+$buildPageURL = function($targetPage) use ($phase, $pm, $projectStatus, $category) {
+    /* 「全部」状态用哨兵值 all，避免控制器把空值误判为首次进入而强制改回 doing */
+    $statusParam = ($projectStatus === '') ? 'all' : $projectStatus;
+    /* 注意：taizhang::browse() 按位置映射形参 ($phase,$pm,$projectStatus,$pageID,$category)，
+     * category 必须排在 pageID 之后，否则会被错位映射到 pageID 形参。 */
+    return helper::createLink('taizhang', 'browse', "phase={$phase}&pm={$pm}&projectStatus={$statusParam}&pageID={$targetPage}&category={$category}");
+};
+
+$pagerHTML  = '<div class="tz-pager">';
+$pagerHTML .= '<span class="tz-pager-info">共 ' . $total . ' 条，每页 ' . $recPerPage . ' 条，第 ' . $pageID . ' / ' . $pageTotal . ' 页</span>';
+$pagerHTML .= '<div class="tz-pager-actions">';
+if($pageID > 1)
+{
+    $pagerHTML .= '<a class="btn btn-default btn-sm" href="' . $buildPageURL(1) . '">首页</a>';
+    $pagerHTML .= '<a class="btn btn-default btn-sm" href="' . $buildPageURL($pageID - 1) . '">上一页</a>';
+}
+else
+{
+    $pagerHTML .= '<span class="btn btn-default btn-sm disabled">首页</span>';
+    $pagerHTML .= '<span class="btn btn-default btn-sm disabled">上一页</span>';
+}
+
+$startPage = max(1, $pageID - 2);
+$endPage   = min($pageTotal, $pageID + 2);
+for($p = $startPage; $p <= $endPage; $p++)
+{
+    if($p == $pageID) $pagerHTML .= '<span class="btn btn-primary btn-sm disabled">' . $p . '</span>';
+    else              $pagerHTML .= '<a class="btn btn-default btn-sm" href="' . $buildPageURL($p) . '">' . $p . '</a>';
+}
+
+if($pageID < $pageTotal)
+{
+    $pagerHTML .= '<a class="btn btn-default btn-sm" href="' . $buildPageURL($pageID + 1) . '">下一页</a>';
+    $pagerHTML .= '<a class="btn btn-default btn-sm" href="' . $buildPageURL($pageTotal) . '">末页</a>';
+}
+else
+{
+    $pagerHTML .= '<span class="btn btn-default btn-sm disabled">下一页</span>';
+    $pagerHTML .= '<span class="btn btn-default btn-sm disabled">末页</span>';
+}
+$pagerHTML .= '</div></div>';
+
 /* ── 渲染到 panel ── */
 panel
 (
     setClass('taizhang-page'),
-    html($filterHTML . $tableHTML)
+    html($filterHTML . $statsHTML . $tableHTML . $pagerHTML)
 );
 
 /* ── 内联 CSS / JS ──

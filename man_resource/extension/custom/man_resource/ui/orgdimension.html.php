@@ -33,6 +33,12 @@ css
 .search-form-row .picker-box { width: 220px; }
 .search-form-row .date-box { width: 140px; }
 .search-form-row .status-box { width: 100px; }
+.calendar-cell { min-width: 92px; padding: 4px 6px; border-radius: 6px; text-align: center; font-size: 12px; line-height: 1.4; }
+.calendar-cell .rate { font-weight: 700; }
+.calendar-cell .hours { color: #475569; }
+.calendar-cell.is-holiday { background: #f8fafc !important; color: #94a3b8; }
+.calendar-cell.is-holiday .hours { color: #94a3b8; }
+.calendar-tip { display: block; color: #64748b; font-size: 11px; }
 CSS
 );
 
@@ -44,7 +50,7 @@ if(common::hasPriv('man_resource', 'memberdimension')) $navItems[] = array('text
 featureBar
 (
     set::current($status),
-    set::linkParams("status={key}&begin={$begin}&end={$end}"),
+    set::linkParams("status={key}&begin=" . str_replace('-', '_', $begin) . "&end=" . str_replace('-', '_', $end) . "&depts={$depts}&roles={$roles}&users={$users}&project={$project}&showHoliday={$showHoliday}&execution={$execution}&viewType={$viewType}"),
     to::item($navItems)
 );
 
@@ -151,6 +157,12 @@ panel
             div
             (
                 setClass('form-group'),
+                h::label($lang->man_resource->viewType),
+                div(setClass('status-box'), select(set::name('viewType'), set::items($lang->man_resource->searchType), set::value($viewType)))
+            ),
+            div
+            (
+                setClass('form-group'),
                 checkbox(set::name('showHoliday'), set::value('1'), set::checked(!empty($showHoliday)), set::text($lang->man_resource->showHoliday))
             ),
             input(set::type('submit'), set::className('btn btn-primary'), set::value($lang->man_resource->search))
@@ -160,6 +172,7 @@ panel
 
 /* Prepare dtable data. */
 $tableData = array();
+$periods   = isset($calendarGrid['periods']) ? $calendarGrid['periods'] : array();
 if(!empty($calendarData))
 {
     foreach($calendarData as $userID => $data)
@@ -182,26 +195,44 @@ if(!empty($calendarData))
         $row->bug_count        = isset($data['bug_count'])        ? $data['bug_count']        : 0;
         $row->bug_fix_days     = isset($data['bug_fix_days'])     ? $data['bug_fix_days']     : 0;
         $row->bug_reopen_count = isset($data['bug_reopen_count']) ? $data['bug_reopen_count'] : 0;
+
+        $cells = isset($calendarGrid['rows'][$userID]['cells']) ? $calendarGrid['rows'][$userID]['cells'] : array();
+        foreach($cells as $idx => $cell)
+        {
+            $cellStatus = $cell['status'];
+            $cellColor  = zget($config->man_resource->loadRangeColors, $cellStatus, new stdClass());
+            $bgColor    = isset($cellColor->bg) ? $cellColor->bg : '#f8fafc';
+            $fgColor    = isset($cellColor->fore) ? $cellColor->fore : (isset($cellColor->text) ? $cellColor->text : '#334155');
+            $holidayCls = !empty($cell['isHoliday']) ? ' is-holiday' : '';
+            $holidayTip = !empty($cell['isHoliday']) ? "<span class='calendar-tip'>{$lang->man_resource->holidayLabel}</span>" : '';
+            $row->{'period_' . $idx} = "<div class='calendar-cell{$holidayCls}' style='background:{$bgColor};color:{$fgColor}' title='{$cell['hours']}h / {$cell['rate']}%'><span class='rate'>{$cell['rate']}%</span><br><span class='hours'>{$cell['hours']}h</span>{$holidayTip}</div>";
+        }
         $tableData[] = $row;
     }
 }
 
+$cols = array
+(
+    array('name' => 'realname',       'title' => $lang->man_resource->user,                  'width' => '150px', 'sortType' => true, 'html' => true, 'fixed' => 'left'),
+    array('name' => 'remain_hours',   'title' => $status == 'done' ? $lang->man_resource->totalConsumeHoursCol : $lang->man_resource->totalEstimatedHoursCol, 'width' => '120px', 'sortType' => true),
+    array('name' => 'parallel_tasks', 'title' => $status == 'done' ? $lang->man_resource->doneCountCol : $lang->man_resource->waitCountCol, 'width' => '120px', 'sortType' => true),
+    array('name' => 'load_rate',      'title' => $lang->man_resource->loadRateCol,            'width' => '110px', 'html' => true)
+);
+foreach($periods as $idx => $period)
+{
+    $cols[] = array('name' => 'period_' . $idx, 'title' => $period['label'], 'width' => $viewType == 'day' ? '96px' : '120px', 'html' => true);
+}
+$cols[] = array('name' => 'estimated_hours',  'title' => $lang->man_resource->estimatedHoursCol,      'width' => '110px', 'sortType' => true);
+$cols[] = array('name' => 'consumed_hours',   'title' => $lang->man_resource->consumeHoursCol,        'width' => '110px', 'sortType' => true);
+$cols[] = array('name' => 'status',           'title' => $lang->man_resource->status,                 'width' => '90px');
+$cols[] = array('name' => 'bug_count',        'title' => $lang->man_resource->bugCountCol,            'width' => '80px',  'sortType' => true);
+$cols[] = array('name' => 'bug_fix_days',     'title' => $lang->man_resource->bugFixDaysCol,          'width' => '100px', 'sortType' => true);
+$cols[] = array('name' => 'bug_reopen_count', 'title' => $lang->man_resource->bugReopenCountCol,      'width' => '100px', 'sortType' => true);
+
 dtable
 (
     setID('orgList'),
-    set::cols(array
-    (
-        array('name' => 'realname',         'title' => $lang->man_resource->user,                  'width' => '150px', 'sortType' => true, 'html' => true),
-        array('name' => 'estimated_hours',  'title' => $lang->man_resource->estimatedHoursCol,      'width' => '100px', 'sortType' => true),
-        array('name' => 'consumed_hours',   'title' => $lang->man_resource->consumeHoursCol,        'width' => '100px', 'sortType' => true),
-        array('name' => 'remain_hours',     'title' => $lang->man_resource->totalEstimatedHoursCol, 'width' => '100px', 'sortType' => true),
-        array('name' => 'parallel_tasks',   'title' => $lang->man_resource->taskCountCol,           'width' => '100px', 'sortType' => true),
-        array('name' => 'load_rate',        'title' => $lang->man_resource->loadRateCol,            'width' => '100px', 'html' => true),
-        array('name' => 'status',           'title' => $lang->man_resource->status,                 'width' => '100px'),
-        array('name' => 'bug_count',        'title' => $lang->man_resource->bugCountCol,            'width' => '80px',  'sortType' => true),
-        array('name' => 'bug_fix_days',     'title' => $lang->man_resource->bugFixDaysCol,          'width' => '100px', 'sortType' => true),
-        array('name' => 'bug_reopen_count', 'title' => $lang->man_resource->bugReopenCountCol,      'width' => '100px', 'sortType' => true)
-    )),
+    set::cols($cols),
     set::data($tableData),
     set::footPager(usePager()),
     set::emptyTip($lang->man_resource->browseTip)
@@ -311,17 +342,5 @@ $chartJS = "<script>\n" .
     "</script>";
 
 render();
-
-/* TEMP DEBUG: show team task debug info */
-if(!empty($debugInfo))
-{
-    panel
-    (
-        set::title('DEBUG: Team Task Data'),
-        setClass('mt-4'),
-        setStyle(array('font-family' => 'monospace')),
-        h::pre(html($debugInfo), setStyle(array('white-space' => 'pre-wrap', 'background' => '#f5f5f5', 'padding' => '12px', 'border-radius' => '4px', 'max-height' => '400px', 'overflow' => 'auto')))
-    );
-}
 
 html($chartJS);

@@ -1,11 +1,11 @@
 {
     "code": "taizhang",
     "name": "项目台账",
-    "version": "1.0.0",
+    "version": "1.3.1",
     "zentaoVersion": ">=20.0",
     "author": "李永杰",
     "email": "wukuili@gmail.com",
-    "description": "项目台账管理插件，统计所有项目的预估成本、已投入成本、当前预估利润率等关键指标，支持多维度筛选和超成本预警",
+    "description": "项目台账管理插件，统计所有项目的预估成本、已投入成本、当前预估利润率等关键指标，支持多维度筛选和超成本预警；含外采金额、回款金额列(万元)，可由CRM对接插件(crmsync)同步商机的合同金额/回款金额自动填充；支持项目类别、合同与工程信息、计划/实际进度、验收与安全管理等工程类台账字段",
     "type": "extension",
     "depend": [],
     "incompatible": []

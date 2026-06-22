@@ -13,10 +13,10 @@ class man_resourceModel extends model
         $out = "=== DEBUG for account: {$userID} | begin={$begin} | end={$end} | status={$status} ===\n\n";
 
         /* 1. Team task IDs */
-        $teamTaskIDs = $this->dao->select('root')->from(TABLE_TEAM)
+        $teamTaskIDs = $status == 'todo' ? $this->dao->select('root')->from(TABLE_TEAM)
             ->where('account')->eq($userID)
             ->andWhere('type')->eq('task')
-            ->fetchPairs('root', 'root');
+            ->fetchPairs('root', 'root') : array();
         $out .= "--- zt_team: " . count($teamTaskIDs) . " task IDs ---\n";
         $out .= implode(', ', $teamTaskIDs) . "\n\n";
 
@@ -224,29 +224,12 @@ class man_resourceModel extends model
         $current = strtotime($begin);
         $last    = strtotime($end);
         
-        $holidays = array();
-        if($showHoliday)
-        {
-            $holidays = $this->dao->select('*')->from(TABLE_HOLIDAY)
-                ->where('begin')->ge($begin)
-                ->andWhere('end')->le($end)
-                ->fetchAll('begin');
-        }
+        $holidays = $this->getHolidayMap($begin, $end);
 
         while($current <= $last)
         {
             $date = date('Y-m-d', $current);
-            $day  = date('w', $current);
-            
-            $isWorkDay = ($day != 0 && $day != 6); // Default: not weekend
-            if($showHoliday && isset($holidays[$date]))
-            {
-                $holiday = $holidays[$date];
-                if($holiday->type == 'holiday') $isWorkDay = false;
-                if($holiday->type == 'working') $isWorkDay = true;
-            }
-            
-            if($isWorkDay) $workDays++;
+            if($this->isWorkingDate($date, $holidays)) $workDays++;
             $current += 86400;
         }
         if($workDays == 0) $workDays = 1;
@@ -258,17 +241,34 @@ class man_resourceModel extends model
             ->beginIF($execution > 0)->andWhere('execution')->eq($execution)->fi()
             ->beginIF($execution <= 0 && !empty($closedIDs))->andWhere('execution')->notIN($closedIDs)->fi()
             ->beginIF(!empty($closedIDs))->andWhere('project')->notIN($closedIDs)->fi()
-            ->beginIF($begin)->andWhere("(deadline >= '$begin' OR deadline = '0000-00-00' OR deadline IS NULL OR deadline = '')")->fi()
-            ->beginIF($end)->andWhere("(estStarted <= '$end' OR estStarted = '0000-00-00' OR estStarted IS NULL OR estStarted = '')")->fi()
+            ->beginIF($projectID > 0)->andWhere('project')->eq($projectID)->fi()
+            ->beginIF($status == 'todo' && $begin)->andWhere("(deadline >= '$begin' OR deadline = '0000-00-00' OR deadline IS NULL OR deadline = '')")->fi()
+            ->beginIF($status == 'todo' && $end)->andWhere("(estStarted <= '$end' OR estStarted = '0000-00-00' OR estStarted IS NULL OR estStarted = '')")->fi()
+            ->beginIF($status == 'done' && $begin)->andWhere("DATE(finishedDate) >= '$begin'")->fi()
+            ->beginIF($status == 'done' && $end)->andWhere("DATE(finishedDate) <= '$end'")->fi()
             ->fetchAll('id');
+
+        if($status == 'done')
+        {
+            $tasks = $this->dao->select('*')->from(TABLE_TASK)
+                ->where('finishedBy')->eq($userID)
+                ->andWhere('deleted')->eq('0')
+                ->beginIF($execution > 0)->andWhere('execution')->eq($execution)->fi()
+                ->beginIF($execution <= 0 && !empty($closedIDs))->andWhere('execution')->notIN($closedIDs)->fi()
+                ->beginIF(!empty($closedIDs))->andWhere('project')->notIN($closedIDs)->fi()
+                ->beginIF($projectID > 0)->andWhere('project')->eq($projectID)->fi()
+                ->beginIF($begin)->andWhere("DATE(finishedDate) >= '$begin'")->fi()
+                ->beginIF($end)->andWhere("DATE(finishedDate) <= '$end'")->fi()
+                ->fetchAll('id');
+        }
 
         /* Also fetch multi-person tasks where user is a team member but not assignedTo. */
         /* For team tasks, do not apply date filters — members' committed hours
            in zt_team should always be counted regardless of task date range. */
-        $teamTaskIDs = $this->dao->select('root')->from(TABLE_TEAM)
+        $teamTaskIDs = $status == 'todo' ? $this->dao->select('root')->from(TABLE_TEAM)
             ->where('account')->eq($userID)
             ->andWhere('type')->eq('task')
-            ->fetchPairs('root', 'root');
+            ->fetchPairs('root', 'root') : array();
         $additionalIDs = array_diff($teamTaskIDs, array_keys($tasks));
         if(!empty($additionalIDs))
         {
@@ -278,6 +278,7 @@ class man_resourceModel extends model
                 ->beginIF($execution > 0)->andWhere('execution')->eq($execution)->fi()
                 ->beginIF($execution <= 0 && !empty($closedIDs))->andWhere('execution')->notIN($closedIDs)->fi()
                 ->beginIF(!empty($closedIDs))->andWhere('project')->notIN($closedIDs)->fi()
+                ->beginIF($projectID > 0)->andWhere('project')->eq($projectID)->fi()
                 ->fetchAll('id');
             $tasks = $tasks + $extraTasks;
         }
@@ -303,6 +304,10 @@ class man_resourceModel extends model
                 $memberEst      = $memberInfo['estimate'];
                 $memberConsumed = $memberInfo['consumed'];
                 $memberLeft     = $memberInfo['left'];
+                if($status == 'done' && isset($task->finishedBy) && $task->finishedBy == $userID && $memberConsumed <= 0)
+                {
+                    $memberConsumed = (float)$task->consumed;
+                }
 
                 /* For team tasks: include the member's hours whenever they participated.
                  * - 'todo' mode: task is active AND (member has remaining OR has estimate)
@@ -327,7 +332,7 @@ class man_resourceModel extends model
                          || ($status == 'done' && ($task->status == 'done' || $task->status == 'closed'));
                 if(!$isActive) continue;
 
-                if($task->assignedTo == $userID)
+                if(($status == 'todo' && $task->assignedTo == $userID) || ($status == 'done' && isset($task->finishedBy) && $task->finishedBy == $userID))
                 {
                     $estimated += (float)$task->estimate;
                     $consumed  += (float)$task->consumed;
@@ -341,7 +346,7 @@ class man_resourceModel extends model
 
         /* Non-task todos: count only when notTaskHourPredict is enabled. */
         $notTaskOn = !empty($this->config->man_resource->notTaskHourPredict);
-        if($notTaskOn && $predictPerTask > 0)
+        if($notTaskOn && $predictPerTask > 0 && $projectID <= 0)
         {
             $todoCondStatus = $status == 'todo' ? "status IN ('wait','doing')" : "status IN ('done','closed')";
             $todoCount = (int)$this->dao->select('COUNT(*) AS c')->from(TABLE_TODO)
@@ -371,7 +376,8 @@ class man_resourceModel extends model
         
         /* Calculate load rate based on total available hours in the period */
         $totalAvailableHours = $stdHours * $workDays;
-        $loadRate = $totalAvailableHours > 0 ? round(($remain / $totalAvailableHours) * 100, 2) : 0;
+        $loadBase = $status == 'done' ? $consumed : $remain;
+        $loadRate = $totalAvailableHours > 0 ? round(($loadBase / $totalAvailableHours) * 100, 2) : 0;
 
         $bugStats = $this->getUserBugStats($userID, $begin, $end);
 
@@ -454,6 +460,179 @@ class man_resourceModel extends model
     }
 
     /**
+     * Fetch holiday records expanded by day for a date range.
+     *
+     * @return array date => type
+     */
+    public function getHolidayMap($begin, $end)
+    {
+        $rows = $this->dao->select('begin, end, type')->from(TABLE_HOLIDAY)
+            ->where('begin')->le($end)
+            ->andWhere('end')->ge($begin)
+            ->fetchAll();
+
+        $map = array();
+        foreach($rows as $row)
+        {
+            $start = strtotime($row->begin);
+            $last  = (!empty($row->end) && $row->end != '0000-00-00') ? strtotime($row->end) : $start;
+            if(!$start || !$last) continue;
+            while($start <= $last)
+            {
+                $map[date('Y-m-d', $start)] = $row->type;
+                $start += 86400;
+            }
+        }
+        return $map;
+    }
+
+    /**
+     * Determine whether a date is a working day after weekend and holiday overrides.
+     */
+    public function isWorkingDate($date, $holidays = array())
+    {
+        $weekendMode = isset($this->config->man_resource->weekend) ? (int)$this->config->man_resource->weekend : 2;
+        $weekDay     = (int)date('w', strtotime($date));
+        $isWorkDay   = $weekendMode == 1 ? ($weekDay != 0) : ($weekDay != 0 && $weekDay != 6);
+
+        if(isset($holidays[$date]))
+        {
+            if($holidays[$date] == 'holiday') $isWorkDay = false;
+            if($holidays[$date] == 'working') $isWorkDay = true;
+        }
+        return $isWorkDay;
+    }
+
+    /**
+     * Build day/week/month buckets for the visible calendar.
+     */
+    public function buildCalendarPeriods($begin, $end, $viewType = 'day', $showHoliday = 0)
+    {
+        if(!in_array($viewType, array('day', 'week', 'month'))) $viewType = 'day';
+
+        $holidays = $this->getHolidayMap($begin, $end);
+        $periods  = array();
+        $current  = strtotime($begin);
+        $last     = strtotime($end);
+
+        while($current <= $last)
+        {
+            $date      = date('Y-m-d', $current);
+            $isWorkDay = $this->isWorkingDate($date, $holidays);
+            if($viewType == 'day' && !$showHoliday && !$isWorkDay)
+            {
+                $current += 86400;
+                continue;
+            }
+
+            if($viewType == 'day')
+            {
+                $periods[] = array(
+                    'key'       => $date,
+                    'label'     => date('m-d', $current),
+                    'tip'       => $date,
+                    'dates'     => array($date),
+                    'workDays'  => $isWorkDay ? 1 : 0,
+                    'isHoliday' => !$isWorkDay,
+                    'holiday'   => isset($holidays[$date]) ? $holidays[$date] : ''
+                );
+                $current += 86400;
+                continue;
+            }
+
+            if($viewType == 'week')
+            {
+                $weekStart = strtotime('monday this week', $current);
+                $weekEnd   = strtotime('sunday this week', $current);
+                $bucketEnd = min($weekEnd, $last);
+                $key       = date('o-\WW', $current);
+                $label     = date('m-d', max($weekStart, strtotime($begin))) . '~' . date('m-d', $bucketEnd);
+            }
+            else
+            {
+                $monthStart = strtotime(date('Y-m-01', $current));
+                $monthEnd   = strtotime(date('Y-m-t', $current));
+                $bucketEnd  = min($monthEnd, $last);
+                $key        = date('Y-m', $current);
+                $label      = date('Y-m', $current);
+            }
+
+            $dates    = array();
+            $workDays = 0;
+            $cursor   = $current;
+            while($cursor <= $bucketEnd)
+            {
+                $d = date('Y-m-d', $cursor);
+                $dates[] = $d;
+                if($this->isWorkingDate($d, $holidays)) $workDays++;
+                $cursor += 86400;
+            }
+
+            $periods[] = array(
+                'key'       => $key,
+                'label'     => $label,
+                'tip'       => reset($dates) . ' ~ ' . end($dates),
+                'dates'     => $dates,
+                'workDays'  => $workDays,
+                'isHoliday' => $workDays == 0,
+                'holiday'   => ''
+            );
+
+            $current = $bucketEnd + 86400;
+        }
+
+        return $periods;
+    }
+
+    /**
+     * Aggregate daily series into the visible resource-calendar matrix.
+     */
+    public function buildCalendarGrid($calendarData, $dailySeries, $begin, $end, $viewType = 'day', $showHoliday = 0)
+    {
+        $stdHours = (float)(isset($this->config->man_resource->workHoursPerDay) ? $this->config->man_resource->workHoursPerDay : 8);
+        if($stdHours <= 0) $stdHours = 8;
+
+        $periods   = $this->buildCalendarPeriods($begin, $end, $viewType, $showHoliday);
+        $dateIndex = array_flip(isset($dailySeries['dates']) ? $dailySeries['dates'] : array());
+        $rows      = array();
+
+        foreach($calendarData as $account => $summary)
+        {
+            $seriesHours = isset($dailySeries['series'][$account]['hours']) ? $dailySeries['series'][$account]['hours'] : array();
+            $cells       = array();
+
+            foreach($periods as $period)
+            {
+                $hours = 0.0;
+                foreach($period['dates'] as $date)
+                {
+                    if(isset($dateIndex[$date]) && isset($seriesHours[$dateIndex[$date]])) $hours += (float)$seriesHours[$dateIndex[$date]];
+                }
+
+                $available = $period['workDays'] * $stdHours;
+                $rate      = $available > 0 ? round(($hours / $available) * 100, 1) : 0;
+                $status    = $this->getLoadStatus($rate);
+
+                $cells[] = array(
+                    'key'       => $period['key'],
+                    'hours'     => round($hours, 1),
+                    'rate'      => $rate,
+                    'status'    => $status,
+                    'workDays'  => $period['workDays'],
+                    'isHoliday' => !empty($period['isHoliday']),
+                    'holiday'   => $period['holiday']
+                );
+            }
+
+            $row          = $summary;
+            $row['cells'] = $cells;
+            $rows[$account] = $row;
+        }
+
+        return array('periods' => $periods, 'rows' => $rows);
+    }
+
+    /**
      * Build a per-day load series for a set of accounts.
      * Returns:
      *   array(
@@ -464,13 +643,13 @@ class man_resourceModel extends model
      *
      * todo mode spreads task->estimate, done mode spreads task->consumed.
      */
-    public function getDailyLoadSeries($accounts, $begin, $end, $status, $execution = 0)
+    public function getDailyLoadSeries($accounts, $begin, $end, $status, $execution = 0, $projectID = 0)
     {
         if(!is_array($accounts)) $accounts = array();
         $stdHours = (float)(isset($this->config->man_resource->workHoursPerDay) ? $this->config->man_resource->workHoursPerDay : 8);
         if($stdHours <= 0) $stdHours = 8;
 
-        $holidays = $this->dao->select('begin, type')->from(TABLE_HOLIDAY)->fetchPairs('begin', 'type');
+        $holidays = $this->getHolidayMap($begin, $end);
         $dates    = $this->collectWorkingDays(strtotime($begin), strtotime($end), $holidays);
 
         $userPairs = $this->loadModel('user')->getPairs('noletter');
@@ -485,38 +664,45 @@ class man_resourceModel extends model
         if(empty($accounts) || empty($dates)) return array('dates' => $dates, 'series' => $series, 'overall' => array());
 
         $closedIDs = $this->getClosedProjectIDs();
-        $tasks = $this->dao->select('id, assignedTo, estimate, consumed, status, estStarted, deadline, finishedDate, mode')
+        $tasks = $this->dao->select('id, assignedTo, finishedBy, estimate, consumed, status, estStarted, deadline, finishedDate, mode')
             ->from(TABLE_TASK)
             ->where('deleted')->eq('0')
-            ->andWhere('assignedTo')->in($accounts)
+            ->beginIF($status == 'todo')->andWhere('assignedTo')->in($accounts)->fi()
+            ->beginIF($status == 'done')->andWhere('finishedBy')->in($accounts)->fi()
             ->beginIF($execution > 0)->andWhere('execution')->eq($execution)->fi()
             ->beginIF($execution <= 0 && !empty($closedIDs))->andWhere('execution')->notIN($closedIDs)->fi()
             ->beginIF(!empty($closedIDs))->andWhere('project')->notIN($closedIDs)->fi()
+            ->beginIF($projectID > 0)->andWhere('project')->eq($projectID)->fi()
             ->beginIF($status == 'todo')->andWhere('status')->notIN('done,closed,cancel')->fi()
             ->beginIF($status == 'done')->andWhere('status')->in('done,closed')->fi()
-            ->beginIF($begin)->andWhere("(deadline >= '$begin' OR deadline = '0000-00-00' OR deadline IS NULL OR deadline = '')")->fi()
-            ->beginIF($end)->andWhere("(estStarted <= '$end' OR estStarted = '0000-00-00' OR estStarted IS NULL OR estStarted = '')")->fi()
+            ->beginIF($status == 'todo' && $begin)->andWhere("(deadline >= '$begin' OR deadline = '0000-00-00' OR deadline IS NULL OR deadline = '')")->fi()
+            ->beginIF($status == 'todo' && $end)->andWhere("(estStarted <= '$end' OR estStarted = '0000-00-00' OR estStarted IS NULL OR estStarted = '')")->fi()
+            ->beginIF($status == 'done' && $begin)->andWhere("DATE(finishedDate) >= '$begin'")->fi()
+            ->beginIF($status == 'done' && $end)->andWhere("DATE(finishedDate) <= '$end'")->fi()
             ->fetchAll('id');
 
         /* Also fetch multi-person tasks where team members are in the account list. */
-        $teamTaskIDs = $this->dao->select('root')->from(TABLE_TEAM)
+        $teamTaskIDs = $status == 'todo' ? $this->dao->select('root')->from(TABLE_TEAM)
             ->where('account')->in($accounts)
             ->andWhere('type')->eq('task')
-            ->fetchPairs('root', 'root');
+            ->fetchPairs('root', 'root') : array();
         $additionalIDs = array_diff($teamTaskIDs, array_keys($tasks));
         if(!empty($additionalIDs))
         {
-            $extraTasks = $this->dao->select('id, assignedTo, estimate, consumed, status, estStarted, deadline, finishedDate, mode')
+            $extraTasks = $this->dao->select('id, assignedTo, finishedBy, estimate, consumed, status, estStarted, deadline, finishedDate, mode')
                 ->from(TABLE_TASK)
                 ->where('id')->in($additionalIDs)
                 ->andWhere('deleted')->eq('0')
                 ->beginIF($execution > 0)->andWhere('execution')->eq($execution)->fi()
                 ->beginIF($execution <= 0 && !empty($closedIDs))->andWhere('execution')->notIN($closedIDs)->fi()
                 ->beginIF(!empty($closedIDs))->andWhere('project')->notIN($closedIDs)->fi()
+                ->beginIF($projectID > 0)->andWhere('project')->eq($projectID)->fi()
                 ->beginIF($status == 'todo')->andWhere('status')->notIN('done,closed,cancel')->fi()
                 ->beginIF($status == 'done')->andWhere('status')->in('done,closed')->fi()
-                ->beginIF($begin)->andWhere("(deadline >= '$begin' OR deadline = '0000-00-00' OR deadline IS NULL OR deadline = '')")->fi()
-                ->beginIF($end)->andWhere("(estStarted <= '$end' OR estStarted = '0000-00-00' OR estStarted IS NULL OR estStarted = '')")->fi()
+                ->beginIF($status == 'todo' && $begin)->andWhere("(deadline >= '$begin' OR deadline = '0000-00-00' OR deadline IS NULL OR deadline = '')")->fi()
+                ->beginIF($status == 'todo' && $end)->andWhere("(estStarted <= '$end' OR estStarted = '0000-00-00' OR estStarted IS NULL OR estStarted = '')")->fi()
+                ->beginIF($status == 'done' && $begin)->andWhere("DATE(finishedDate) >= '$begin'")->fi()
+                ->beginIF($status == 'done' && $end)->andWhere("DATE(finishedDate) <= '$end'")->fi()
                 ->fetchAll('id');
             $tasks = $tasks + $extraTasks;
         }
@@ -546,6 +732,21 @@ class man_resourceModel extends model
 
             if($isMulti)
             {
+                $finishedByHasMemberConsumed = !empty($task->finishedBy) && isset($taskTeam[$task->finishedBy]) && $taskTeam[$task->finishedBy]['consumed'] > 0;
+                if($status == 'done' && !empty($task->finishedBy) && isset($series[$task->finishedBy]) && !$finishedByHasMemberConsumed)
+                {
+                    $totalHours = (float)$task->consumed;
+                    if($totalHours > 0)
+                    {
+                        $perDay = $totalHours / count($taskDays);
+                        foreach($taskDays as $date)
+                        {
+                            if(!isset($dateIndex[$date])) continue;
+                            $series[$task->finishedBy]['hours'][$dateIndex[$date]] += $perDay;
+                        }
+                    }
+                }
+
                 /* Multi-person task: spread each member's hours across the task days. */
                 foreach($taskTeam as $account => $memberInfo)
                 {
@@ -564,7 +765,8 @@ class man_resourceModel extends model
             else
             {
                 /* Single-person task: original logic. */
-                if(!isset($series[$task->assignedTo])) continue;
+                $owner = ($status == 'done' && !empty($task->finishedBy) && isset($series[$task->finishedBy])) ? $task->finishedBy : $task->assignedTo;
+                if(!isset($series[$owner])) continue;
 
                 $totalHours = $status == 'done' ? (float)$task->consumed : (float)$task->estimate;
                 if($status == 'todo' && $totalHours <= 0 && $taskPredictOn && $predictPerTask > 0) $totalHours = $predictPerTask;
@@ -574,7 +776,7 @@ class man_resourceModel extends model
                 foreach($taskDays as $date)
                 {
                     if(!isset($dateIndex[$date])) continue;
-                    $series[$task->assignedTo]['hours'][$dateIndex[$date]] += $perDay;
+                    $series[$owner]['hours'][$dateIndex[$date]] += $perDay;
                 }
             }
         }
@@ -1078,20 +1280,13 @@ class man_resourceModel extends model
      */
     public function collectWorkingDays($beginTs, $endTs, $holidays = null)
     {
-        if($holidays === null) $holidays = $this->dao->select('begin, type')->from(TABLE_HOLIDAY)->fetchPairs('begin', 'type');
+        if($holidays === null) $holidays = $this->getHolidayMap(date('Y-m-d', $beginTs), date('Y-m-d', $endTs));
         $days   = array();
         $cursor = $beginTs;
         while($cursor <= $endTs)
         {
             $date = date('Y-m-d', $cursor);
-            $w    = (int)date('w', $cursor);
-            $isWorkDay = ($w != 0 && $w != 6);
-            if(isset($holidays[$date]))
-            {
-                if($holidays[$date] == 'holiday') $isWorkDay = false;
-                if($holidays[$date] == 'working') $isWorkDay = true;
-            }
-            if($isWorkDay) $days[] = $date;
+            if($this->isWorkingDate($date, $holidays)) $days[] = $date;
             $cursor += 86400;
         }
         return $days;
@@ -1103,34 +1298,37 @@ class man_resourceModel extends model
      *   todo: status NOT IN (done, closed, cancel)
      *   done: status IN (done, closed)
      */
-    public function getUserTasks($userID, $begin, $end, $status, $execution = 0)
+    public function getUserTasks($userID, $begin, $end, $status, $execution = 0, $projectID = 0)
     {
         $closedIDs = $this->getClosedProjectIDs();
-        $tasks = $this->dao->select('t1.id, t1.name, t1.status, t1.estimate, t1.consumed, t1.left, t1.deadline, t1.estStarted, t1.project, t1.execution, t1.assignedTo, t1.mode, t2.name AS projectName, t3.name AS executionName')
+        $tasks = $this->dao->select('t1.id, t1.name, t1.status, t1.estimate, t1.consumed, t1.left, t1.deadline, t1.estStarted, t1.finishedBy, t1.finishedDate, t1.project, t1.execution, t1.assignedTo, t1.mode, t2.name AS projectName, t3.name AS executionName')
             ->from(TABLE_TASK)->alias('t1')
             ->leftJoin(TABLE_PROJECT)->alias('t2')->on('t1.project = t2.id')
             ->leftJoin(TABLE_PROJECT)->alias('t3')->on('t1.execution = t3.id')
-            ->where('t1.assignedTo')->eq($userID)
+            ->where($status == 'done' ? 't1.finishedBy' : 't1.assignedTo')->eq($userID)
             ->andWhere('t1.deleted')->eq('0')
             ->beginIF($execution > 0)->andWhere('t1.execution')->eq($execution)->fi()
             ->beginIF($execution <= 0 && !empty($closedIDs))->andWhere('t1.execution')->notIN($closedIDs)->fi()
             ->beginIF(!empty($closedIDs))->andWhere('t1.project')->notIN($closedIDs)->fi()
-            ->beginIF($begin)->andWhere("(t1.deadline >= '$begin' OR t1.deadline = '0000-00-00' OR t1.deadline IS NULL OR t1.deadline = '')")->fi()
-            ->beginIF($end)->andWhere("(t1.estStarted <= '$end' OR t1.estStarted = '0000-00-00' OR t1.estStarted IS NULL OR t1.estStarted = '')")->fi()
+            ->beginIF($projectID > 0)->andWhere('t1.project')->eq($projectID)->fi()
+            ->beginIF($status == 'todo' && $begin)->andWhere("(t1.deadline >= '$begin' OR t1.deadline = '0000-00-00' OR t1.deadline IS NULL OR t1.deadline = '')")->fi()
+            ->beginIF($status == 'todo' && $end)->andWhere("(t1.estStarted <= '$end' OR t1.estStarted = '0000-00-00' OR t1.estStarted IS NULL OR t1.estStarted = '')")->fi()
+            ->beginIF($status == 'done' && $begin)->andWhere("DATE(t1.finishedDate) >= '$begin'")->fi()
+            ->beginIF($status == 'done' && $end)->andWhere("DATE(t1.finishedDate) <= '$end'")->fi()
             ->beginIF($status == 'todo')->andWhere('t1.status')->notIN('done,closed,cancel')->fi()
             ->beginIF($status == 'done')->andWhere('t1.status')->in('done,closed')->fi()
-            ->orderBy('t1.deadline_asc, t1.id_desc')
+            ->orderBy($status == 'done' ? 't1.finishedDate_desc, t1.id_desc' : 't1.deadline_asc, t1.id_desc')
             ->fetchAll('id');
 
         /* Also fetch multi-person tasks where user is a team member but not assignedTo. */
-        $teamTaskIDs = $this->dao->select('root')->from(TABLE_TEAM)
+        $teamTaskIDs = $status == 'todo' ? $this->dao->select('root')->from(TABLE_TEAM)
             ->where('account')->eq($userID)
             ->andWhere('type')->eq('task')
-            ->fetchPairs('root', 'root');
+            ->fetchPairs('root', 'root') : array();
         $additionalIDs = array_diff($teamTaskIDs, array_keys($tasks));
         if(!empty($additionalIDs))
         {
-            $extraTasks = $this->dao->select('t1.id, t1.name, t1.status, t1.estimate, t1.consumed, t1.left, t1.deadline, t1.estStarted, t1.project, t1.execution, t1.assignedTo, t1.mode, t2.name AS projectName, t3.name AS executionName')
+            $extraTasks = $this->dao->select('t1.id, t1.name, t1.status, t1.estimate, t1.consumed, t1.left, t1.deadline, t1.estStarted, t1.finishedBy, t1.finishedDate, t1.project, t1.execution, t1.assignedTo, t1.mode, t2.name AS projectName, t3.name AS executionName')
                 ->from(TABLE_TASK)->alias('t1')
                 ->leftJoin(TABLE_PROJECT)->alias('t2')->on('t1.project = t2.id')
                 ->leftJoin(TABLE_PROJECT)->alias('t3')->on('t1.execution = t3.id')
@@ -1139,9 +1337,12 @@ class man_resourceModel extends model
                 ->beginIF($execution > 0)->andWhere('t1.execution')->eq($execution)->fi()
                 ->beginIF($execution <= 0 && !empty($closedIDs))->andWhere('t1.execution')->notIN($closedIDs)->fi()
                 ->beginIF(!empty($closedIDs))->andWhere('t1.project')->notIN($closedIDs)->fi()
+                ->beginIF($projectID > 0)->andWhere('t1.project')->eq($projectID)->fi()
                 ->beginIF($status == 'todo')->andWhere('t1.status')->notIN('done,closed,cancel')->fi()
                 ->beginIF($status == 'done')->andWhere('t1.status')->in('done,closed')->fi()
-                ->orderBy('t1.deadline_asc, t1.id_desc')
+                ->beginIF($status == 'done' && $begin)->andWhere("DATE(t1.finishedDate) >= '$begin'")->fi()
+                ->beginIF($status == 'done' && $end)->andWhere("DATE(t1.finishedDate) <= '$end'")->fi()
+                ->orderBy($status == 'done' ? 't1.finishedDate_desc, t1.id_desc' : 't1.deadline_asc, t1.id_desc')
                 ->fetchAll('id');
             $tasks = $tasks + $extraTasks;
         }
@@ -1161,6 +1362,109 @@ class man_resourceModel extends model
         }
 
         return $tasks;
+    }
+
+    /**
+     * Build a personal detail list covering stable ZenTao objects.
+     *
+     * Tasks and todos exist in standard installs. Bug rows are appended only when
+     * the bug table constant is available.
+     */
+    public function getUserWorkItems($userID, $begin, $end, $status, $projectID = 0, $execution = 0)
+    {
+        $items = array();
+
+        $tasks = $this->getUserTasks($userID, $begin, $end, $status, $execution, $projectID);
+        foreach($tasks as $task)
+        {
+            $items[] = array(
+                'type'      => 'task',
+                'typeName'  => '任务',
+                'id'        => (int)$task->id,
+                'name'      => $task->name,
+                'status'    => $task->status,
+                'project'   => $task->projectName,
+                'execution' => $task->executionName,
+                'date'      => $status == 'done' ? substr((string)$task->finishedDate, 0, 10) : (($task->deadline && $task->deadline != '0000-00-00') ? $task->deadline : ''),
+                'hours'     => $status == 'done' ? (float)$task->consumed : (float)$task->left,
+                'url'       => helper::createLink('task', 'view', "taskID={$task->id}")
+            );
+        }
+
+        $todoStatus = $status == 'todo' ? "status IN ('wait','doing')" : "status IN ('done','closed')";
+        $todos = $this->dao->select('id, name, type, status, date, assignedTo')
+            ->from(TABLE_TODO)
+            ->where('deleted')->eq('0')
+            ->andWhere('assignedTo')->eq($userID)
+            ->andWhere($todoStatus)
+            ->andWhere('date')->between($begin, $end)
+            ->orderBy('date_asc, id_desc')
+            ->fetchAll();
+
+        $predictPerTask = (float)(isset($this->config->man_resource->predictHours) ? $this->config->man_resource->predictHours : 0);
+        foreach($todos as $todo)
+        {
+            $items[] = array(
+                'type'      => 'todo',
+                'typeName'  => '待办',
+                'id'        => (int)$todo->id,
+                'name'      => $todo->name,
+                'status'    => $todo->status,
+                'project'   => '',
+                'execution' => '',
+                'date'      => $todo->date,
+                'hours'     => $predictPerTask,
+                'url'       => helper::createLink('todo', 'view', "todoID={$todo->id}")
+            );
+        }
+
+        if(defined('TABLE_BUG'))
+        {
+            $bugQuery = $this->dao->select('id, title, status, project, execution, deadline, resolvedDate')
+                ->from(TABLE_BUG)
+                ->where('deleted')->eq('0')
+                ->andWhere($status == 'todo' ? 'assignedTo' : 'resolvedBy')->eq($userID)
+                ->beginIF($projectID > 0)->andWhere('project')->eq($projectID)->fi()
+                ->beginIF($execution > 0)->andWhere('execution')->eq($execution)->fi();
+
+            if($status == 'todo')
+            {
+                $bugQuery->andWhere('status')->eq('active')
+                    ->andWhere("(deadline >= '$begin' OR deadline = '0000-00-00' OR deadline IS NULL OR deadline = '')")
+                    ->andWhere("(openedDate <= '$end' OR openedDate IS NULL)");
+            }
+            else
+            {
+                $bugQuery->andWhere('resolvedDate')->ge($begin)
+                    ->andWhere('resolvedDate')->le($end . ' 23:59:59');
+            }
+
+            $bugs = $bugQuery->orderBy('id_desc')->fetchAll();
+            foreach($bugs as $bug)
+            {
+                $items[] = array(
+                    'type'      => 'bug',
+                    'typeName'  => 'Bug',
+                    'id'        => (int)$bug->id,
+                    'name'      => $bug->title,
+                    'status'    => $bug->status,
+                    'project'   => '',
+                    'execution' => '',
+                    'date'      => $status == 'done' ? substr((string)$bug->resolvedDate, 0, 10) : (($bug->deadline && $bug->deadline != '0000-00-00') ? $bug->deadline : ''),
+                    'hours'     => $predictPerTask,
+                    'url'       => helper::createLink('bug', 'view', "bugID={$bug->id}")
+                );
+            }
+        }
+
+        usort($items, function($a, $b){
+            $dateA = empty($a['date']) ? '9999-12-31' : $a['date'];
+            $dateB = empty($b['date']) ? '9999-12-31' : $b['date'];
+            if($dateA == $dateB) return $b['id'] - $a['id'];
+            return strcmp($dateA, $dateB);
+        });
+
+        return $items;
     }
 
     /**
@@ -1213,21 +1517,15 @@ class man_resourceModel extends model
         $remaining = abs($days);
         $cursor    = $timestamp;
 
-        $holidays = $this->dao->select('begin, type')->from(TABLE_HOLIDAY)
-            ->fetchPairs('begin', 'type');
+        $spanBegin = date('Y-m-d', $days > 0 ? $timestamp : strtotime('-1 year', $timestamp));
+        $spanEnd   = date('Y-m-d', $days > 0 ? strtotime('+1 year', $timestamp) : $timestamp);
+        $holidays  = $this->getHolidayMap($spanBegin, $spanEnd);
 
         while($remaining > 0)
         {
             $cursor += $step;
             $date = date('Y-m-d', $cursor);
-            $w    = (int)date('w', $cursor);
-            $isWorkDay = ($w != 0 && $w != 6);
-            if(isset($holidays[$date]))
-            {
-                if($holidays[$date] == 'holiday') $isWorkDay = false;
-                if($holidays[$date] == 'working') $isWorkDay = true;
-            }
-            if($isWorkDay) $remaining--;
+            if($this->isWorkingDate($date, $holidays)) $remaining--;
         }
         return $cursor;
     }
