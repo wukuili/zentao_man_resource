@@ -73,6 +73,15 @@ $fmtConstructionOnly = function($val, $category) use ($fmtPlain) {
     return $fmtPlain($val);
 };
 
+/* 详情抽屉：单条 label/value 行（value 已是格式化后的 HTML） */
+$dRow = function($label, $value) {
+    return '<div class="tz-d-row"><div class="tz-d-label">' . htmlspecialchars($label) . '</div><div class="tz-d-value">' . $value . '</div></div>';
+};
+/* 详情抽屉：分组小节 */
+$dSection = function($title, $rowsHtml) {
+    return '<div class="tz-d-section"><div class="tz-d-section-title">' . htmlspecialchars($title) . '</div>' . $rowsHtml . '</div>';
+};
+
 /* 筛选区 HTML */
 $filterHTML  = '<div class="tz-filter-bar">';
 $filterHTML .= '<label>项目阶段</label>' . $buildSelect('tzFilterPhase', 'phase', $phaseOptions, $phase);
@@ -147,10 +156,11 @@ $tableHTML .= '<th style="width:80px">当前预估<br>利润率(%)</th>';
 $tableHTML .= '<th style="min-width:140px">进度偏差说明</th>';
 $tableHTML .= '<th style="min-width:120px">备注</th>';
 $tableHTML .= '<th style="min-width:160px">近期项目成员</th>';
-$tableHTML .= '<th style="width:84px">操作</th>';
+$tableHTML .= '<th class="tz-col-action" style="width:84px">操作</th>';
 $tableHTML .= '</tr></thead>';
 
 /* 数据行 */
+$detailStore = '';   /* 各行详情内容，隐藏存放，供右侧抽屉展示 */
 $tableHTML .= '<tbody>';
 if(empty($entries))
 {
@@ -224,7 +234,18 @@ else
             $tableHTML .= '<td class="td-program" rowspan="' . $groupSpans[$idx] . '">' . ($entry->programName !== '' ? htmlspecialchars($entry->programName) : '<span class="tz-na">-</span>') . '</td>';
         }
         $idx++;
-        $tableHTML .= '<td>' . htmlspecialchars($entry->shortName ?: $entry->projectName) . '</td>';
+        /* 项目简称：同步行（projectID>0）做成超链接，点击跳转到禅道项目详情页；手动行无项目，纯文本 */
+        $displayName = htmlspecialchars($entry->shortName ?: $entry->projectName);
+        if((int)$entry->projectID > 0)
+        {
+            $projectURL = helper::createLink('project', 'view', "projectID={$entry->projectID}");
+            $nameCell   = '<a href="' . $projectURL . '" target="_blank" class="tz-project-link">' . $displayName . '</a>';
+        }
+        else
+        {
+            $nameCell = $displayName;
+        }
+        $tableHTML .= '<td>' . $nameCell . '</td>';
         $tableHTML .= '<td class="td-center">' . htmlspecialchars($entry->phase) . '</td>';
         $tableHTML .= '<td class="td-center">' . $fmtPlain($entry->projectCategory) . '</td>';
         $tableHTML .= '<td class="td-center">' . htmlspecialchars($entry->pmName) . '</td>';
@@ -258,11 +279,68 @@ else
         $tableHTML .= '<td class="td-status">' . nl2br($fmtPlain($entry->progressDeviation)) . '</td>';
         $tableHTML .= '<td class="td-status">' . nl2br($fmtPlain($entry->remark)) . '</td>';
         $tableHTML .= '<td class="td-members">' . htmlspecialchars($entry->recentMembers) . '</td>';
-        $tableHTML .= '<td class="td-center"><div class="tz-actions">';
+        $tableHTML .= '<td class="td-center tz-col-action"><div class="tz-actions">';
+        $tableHTML .= '<a href="javascript:void(0)" class="text-info" onclick="tzShowDetail(' . (int)$entry->id . ')">详情</a>';
         $tableHTML .= '<a href="' . $editURL . '" class="text-primary">编辑</a>';
         $tableHTML .= '<a href="javascript:void(0)" class="text-danger" onclick="tzDeleteEntry(' . (int)$entry->id . ', \'' . $deleteURL . '\')">删除</a>';
         $tableHTML .= '</div></td>';
         $tableHTML .= '</tr>';
+
+        /* ── 构建该行的详情内容，隐藏存放，供右侧抽屉展示 ── */
+        $detailProfit = ($profitRate !== null) ? ($profitRate . '%') : $lang->taizhang->profitRateNA;
+        $detailProfitClass = '';
+        if($profitRate === null || $profitRate <= $dangerRate) $detailProfitClass = 'tz-warn';
+        elseif($profitRate < $warnRate) $detailProfitClass = 'tz-warn';
+
+        $secBase  = $dRow('项目集', $entry->programName !== '' ? htmlspecialchars($entry->programName) : '<span class="tz-na">-</span>');
+        $secBase .= $dRow('项目简称', $nameCell);
+        $secBase .= $dRow('项目阶段', htmlspecialchars($entry->phase));
+        $secBase .= $dRow('项目类别', $fmtPlain($entry->projectCategory));
+        $secBase .= $dRow('项目经理', htmlspecialchars($entry->pmName));
+        $secBase .= $dRow('项目状态', htmlspecialchars($entry->projectStatusName));
+
+        $secDesc  = $dRow('当前项目情况', nl2br($fmtPlain($entry->currentStatus)));
+        $secDesc .= $dRow('项目简介', nl2br($fmtPlain($entry->projectIntro)));
+        $secDesc .= $dRow('进度偏差说明', nl2br($fmtPlain($entry->progressDeviation)));
+        $secDesc .= $dRow('备注', nl2br($fmtPlain($entry->remark)));
+        $secDesc .= $dRow('近期项目成员', $fmtPlain($entry->recentMembers));
+
+        $secEng  = $dRow('合同签署时间', $fmtPlain($entry->contractSignDate));
+        $secEng .= $dRow('分包合同状态', $fmtConstructionOnly($entry->subcontractStatus, $entry->projectCategory));
+        $secEng .= $dRow('工程状态', $fmtPlain($entry->engineeringStatus));
+        $secEng .= $dRow('采购方式', $fmtPlain($entry->procurementMethod));
+        $secEng .= $dRow('供货单位', $fmtPlain($entry->supplyUnit));
+        $secEng .= $dRow('安装/施工单位', $fmtPlain($entry->constructionUnit));
+        $secEng .= $dRow('验收情况', $fmtPlain($entry->acceptanceStatus));
+        $secEng .= $dRow('安保措施是否到位', $fmtConstructionOnly($entry->securityMeasures, $entry->projectCategory));
+        $secEng .= $dRow('是否涉及危险作业', $fmtConstructionOnly($entry->hazardousWork, $entry->projectCategory));
+        $secEng .= $dRow('开工资料是否齐全', $fmtConstructionOnly($entry->startDocsComplete, $entry->projectCategory));
+
+        $secDate  = $dRow('计划开工日期', $fmtPlain($entry->planStartDate));
+        $secDate .= $dRow('实际开工日期', $fmtPlain($entry->actualStartDate));
+        $secDate .= $dRow('计划完工日期', $fmtPlain($entry->planEndDate));
+        $secDate .= $dRow('实际完工日期', $fmtPlain($entry->actualEndDate));
+
+        $overTag  = ($initBudget > 0 && $investedCost > $initBudget) ? '<span class="tz-warn">' . $investedCost . '</span>' : (string)$investedCost;
+        $secCost  = $dRow('初始预估人天', (string)$entry->initEstHours);
+        $secCost .= $dRow('初始预估成本(万元)', (string)$entry->initBudget);
+        $secCost .= $dRow('已投入人天', (string)$entry->investedHours);
+        $secCost .= $dRow('已投入成本(除外购和税/万元)', $overTag);
+        $secCost .= $dRow('当前预估人天', (string)$entry->currentEstHours);
+        $secCost .= $dRow('当前预估成本(万元)', (string)$currentBudget);
+        $secCost .= $dRow('合同金额(万元)', (string)$revenue);
+        $secCost .= $dRow('外采金额(万元)', (string)$outsourcing);
+        $secCost .= $dRow('回款金额(万元)', (string)$received);
+        $secCost .= $dRow('当前预估利润率', '<span class="' . $detailProfitClass . '">' . $detailProfit . '</span>');
+
+        $detailTitle = htmlspecialchars($entry->shortName ?: $entry->projectName);
+        $detailStore .= '<div class="tz-detail-body" data-detail-id="' . (int)$entry->id . '" data-detail-title="' . $detailTitle . '">'
+            . $dSection('基本信息', $secBase)
+            . $dSection('项目情况', $secDesc)
+            . $dSection('合同与工程', $secEng)
+            . $dSection('关键日期', $secDate)
+            . $dSection('成本与利润', $secCost)
+            . '</div>';
     }
 }
 $tableHTML .= '</tbody>';
@@ -286,11 +364,20 @@ if(!empty($entries))
     $tableHTML .= '<td class="td-right">' . $summary['outsourcingAmount'] . '</td>';
     $tableHTML .= '<td class="td-right">' . $summary['receivedAmount'] . '</td>';
     $tableHTML .= '<td class="' . $sProfitClass . '">' . $sProfitDisplay . '</td>';
-    $tableHTML .= '<td></td><td></td><td></td><td></td>';
+    $tableHTML .= '<td></td><td></td><td></td><td class="tz-col-action"></td>';
     $tableHTML .= '</tr></tfoot>';
 }
 
 $tableHTML .= '</table></div>';
+
+/* ── 右侧详情抽屉（默认隐藏，点击"详情"滑出） + 隐藏的详情数据仓库 ── */
+$drawerHTML  = '<div id="tzDetailStore" style="display:none">' . $detailStore . '</div>';
+$drawerHTML .= '<div id="tzDetailOverlay" class="tz-detail-overlay" onclick="tzCloseDetail()"></div>';
+$drawerHTML .= '<div id="tzDetailDrawer" class="tz-detail-drawer">';
+$drawerHTML .= '<div class="tz-detail-header"><span id="tzDetailTitle">项目详情</span>'
+    . '<a href="javascript:void(0)" class="tz-detail-close" onclick="tzCloseDetail()" title="关闭">&times;</a></div>';
+$drawerHTML .= '<div id="tzDetailContent" class="tz-detail-content"></div>';
+$drawerHTML .= '</div>';
 
 $buildPageURL = function($targetPage) use ($phase, $pm, $projectStatus, $category) {
     /* 「全部」状态用哨兵值 all，避免控制器把空值误判为首次进入而强制改回 doing */
@@ -338,7 +425,7 @@ $pagerHTML .= '</div></div>';
 panel
 (
     setClass('taizhang-page'),
-    html($filterHTML . $statsHTML . $tableHTML . $pagerHTML)
+    html($filterHTML . $statsHTML . $tableHTML . $pagerHTML . $drawerHTML)
 );
 
 /* ── 内联 CSS / JS ──

@@ -109,6 +109,7 @@ $lang->waibao->export          = '导出';
 $lang->waibao->noData          = '暂无数据';
 $lang->waibao->setSuccess      = '设置成功';
 $lang->waibao->setFail         = '设置失败';
+$lang->waibao->denyWrite       = '抱歉，仅系统管理员可修改用户外包标识。';
 $lang->waibao->dateRequired    = '请选择日期范围';
 
 /* 权限资源 */

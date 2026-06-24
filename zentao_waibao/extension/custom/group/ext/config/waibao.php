@@ -14,7 +14,9 @@ if(isset($config->group->package))
     $config->group->package->waibaother->privs['waibao-browse']              = array('edition' => 'open,biz,max,ipd', 'vision' => 'rnd', 'order' => 5,  'depend' => array());
     $config->group->package->waibaother->privs['waibao-orgdimension']        = array('edition' => 'open,biz,max,ipd', 'vision' => 'rnd', 'order' => 10, 'depend' => array());
     $config->group->package->waibaother->privs['waibao-projectdimension']     = array('edition' => 'open,biz,max,ipd', 'vision' => 'rnd', 'order' => 15, 'depend' => array());
+    $config->group->package->waibaother->privs['waibao-projectOverview']      = array('edition' => 'open,biz,max,ipd', 'vision' => 'rnd', 'order' => 16, 'depend' => array());
     $config->group->package->waibaother->privs['waibao-memberdimension']      = array('edition' => 'open,biz,max,ipd', 'vision' => 'rnd', 'order' => 20, 'depend' => array());
+    $config->group->package->waibaother->privs['waibao-summary']             = array('edition' => 'open,biz,max,ipd', 'vision' => 'rnd', 'order' => 22, 'depend' => array());
     $config->group->package->waibaother->privs['waibao-setUserOutsourced']    = array('edition' => 'open,biz,max,ipd', 'vision' => 'rnd', 'order' => 25, 'depend' => array());
     $config->group->package->waibaother->privs['waibao-batchSetOutsourced']   = array('edition' => 'open,biz,max,ipd', 'vision' => 'rnd', 'order' => 30, 'depend' => array());
 }

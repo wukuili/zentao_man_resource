@@ -50,10 +50,29 @@ class waibao extends control
     }
 
     /**
+     * 判断当前用户是否为系统/公司管理员。
+     *
+     * @access protected
+     * @return bool
+     */
+    protected function waibaoIsAdmin()
+    {
+        $user = $this->app->user;
+        if(empty($user)) return false;
+        if(!empty($user->admin)) return true;
+        return strpos(",{$this->app->company->admins},", ",{$user->account},") !== false;
+    }
+
+    /**
      * 设置单个用户的外包标识
      */
     public function setUserOutsourced($userID = 0)
     {
+        /* 标记用户为外包/自有属于组织级操作，仅管理员可执行。
+         * navGroup 归入 project 后，项目成员经 isProjectAdmin 可访问 waibao 模块，
+         * 此处显式拦截写操作，防止项目成员越权修改用户外包标识。*/
+        if(!$this->waibaoIsAdmin()) return $this->send(array('result' => 'fail', 'message' => $this->lang->waibao->denyWrite));
+
         if($this->server->request_method == 'POST')
         {
             $userID    = (int)$this->post->userID;
@@ -85,6 +104,9 @@ class waibao extends control
      */
     public function batchSetOutsourced($outsourced = 0)
     {
+        /* 同 setUserOutsourced：批量改外包标识为组织级写操作，仅管理员可执行。*/
+        if(!$this->waibaoIsAdmin()) return $this->send(array('result' => 'fail', 'message' => $this->lang->waibao->denyWrite));
+
         if($this->server->request_method == 'POST')
         {
             $userIDs = $this->post->userIDs;
@@ -403,8 +425,12 @@ class waibao extends control
         if(empty($begin) || $begin == '-') $begin = date('Y-m-01');
         if(empty($end)   || $end   == '-') $end   = date('Y-m-t');
 
+        /* 注意：不要在此手动调用 $this->project->setMenu($projectID)。
+         * 项目应用壳层会按 URL 中的 projectID 自动构建项目菜单；手动 setMenu 会再次执行
+         * checkAccess()/resetProjectPriv() 并改写 session->project，admin 在项目集(program)
+         * 上下文下会因此与壳层项目上下文错位，被判非法而跳回「我的地盘」首页。
+         * 参照同仓库可正常工作的 man_resource 项目页：同样不调用 setMenu。*/
         $project = $projectID > 0 ? $this->loadModel('project')->getByID($projectID) : null;
-        if($project) $this->project->setMenu($projectID);
 
         $data = $this->waibao->getProjectOutsourcedMembers($projectID, $begin, $end);
 

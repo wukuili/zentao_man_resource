@@ -62,6 +62,35 @@
     };
 
     /**
+     * 查看详情：把对应行的隐藏详情内容注入右侧抽屉并滑出
+     */
+    window.tzShowDetail = function(id) {
+        var src = document.querySelector('#tzDetailStore [data-detail-id="' + id + '"]');
+        if(!src) return;
+        var content = document.getElementById('tzDetailContent');
+        var title   = document.getElementById('tzDetailTitle');
+        if(content) content.innerHTML = src.innerHTML;
+        if(title)   title.textContent = src.getAttribute('data-detail-title') || '项目详情';
+        if(content) content.scrollTop = 0;
+        document.getElementById('tzDetailDrawer').classList.add('open');
+        document.getElementById('tzDetailOverlay').classList.add('open');
+    };
+
+    /**
+     * 关闭详情抽屉
+     */
+    window.tzCloseDetail = function() {
+        var d = document.getElementById('tzDetailDrawer');
+        var o = document.getElementById('tzDetailOverlay');
+        if(d) d.classList.remove('open');
+        if(o) o.classList.remove('open');
+    };
+
+    document.addEventListener('keydown', function(e) {
+        if(e.key === 'Escape') window.tzCloseDetail();
+    });
+
+    /**
      * 项目类别联动：分包合同状态/开工资料是否齐全/安保措施是否到位/是否涉及危险作业
      * 仅施工类、集成类项目展示；初始可见性已由服务端按当前值渲染，这里只处理切换。
      */

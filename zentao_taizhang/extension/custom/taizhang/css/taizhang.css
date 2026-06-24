@@ -137,6 +137,106 @@
 .tz-actions { display: flex; gap: 6px; justify-content: center; white-space: nowrap; }
 .tz-actions a { font-size: 12px; }
 
+/* 操作列固定漂浮在右侧（横向滚动时始终可见） */
+.tz-table th.tz-col-action,
+.tz-table td.tz-col-action {
+    position: sticky;
+    right: 0;
+    box-shadow: -3px 0 6px -2px rgba(0, 0, 0, .15);
+}
+/* 表体单元格需不透明背景，否则横向滚动时下层内容会透出；并跟随斑马纹/悬停底色 */
+.tz-table tbody td.tz-col-action { background-color: #fff; z-index: 1; }
+.tz-table tbody tr:nth-child(even) td.tz-col-action { background-color: #f8f9fa; }
+.tz-table tbody tr:hover td.tz-col-action { background-color: #e8f4fd !important; }
+/* 表头同时固定顶部+右侧，层级需高于其它表头与表体固定列 */
+.tz-table thead th.tz-col-action { z-index: 5; }
+/* 合计行固定列保持表脚底色 */
+.tz-table tfoot td.tz-col-action { background-color: #e8f0fe; z-index: 1; }
+
+/* 项目简称超链接 */
+.tz-project-link { color: #2e7fd1; text-decoration: none; }
+.tz-project-link:hover { color: #1a5fa5; text-decoration: underline; }
+
+/* ===== 项目详情抽屉 ===== */
+.tz-detail-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .35);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .25s ease;
+    z-index: 1900;
+}
+.tz-detail-overlay.open { opacity: 1; visibility: visible; }
+.tz-detail-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 560px;
+    max-width: 92vw;
+    background: #fff;
+    box-shadow: -6px 0 24px rgba(0, 0, 0, .18);
+    transform: translateX(100%);
+    transition: transform .28s ease;
+    z-index: 1901;
+    display: flex;
+    flex-direction: column;
+}
+.tz-detail-drawer.open { transform: translateX(0); }
+.tz-detail-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    background: #4a9ed7;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+}
+.tz-detail-close {
+    color: #fff;
+    font-size: 24px;
+    line-height: 1;
+    text-decoration: none;
+    opacity: .85;
+}
+.tz-detail-close:hover { color: #fff; opacity: 1; }
+.tz-detail-content {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 16px 20px 28px;
+}
+.tz-d-section { margin-bottom: 18px; }
+.tz-d-section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #4a9ed7;
+    padding: 6px 0;
+    margin-bottom: 6px;
+    border-bottom: 2px solid #e3eef7;
+}
+.tz-d-row {
+    display: flex;
+    align-items: flex-start;
+    padding: 7px 0;
+    border-bottom: 1px dashed #eee;
+    font-size: 13px;
+    line-height: 1.6;
+}
+.tz-d-label {
+    flex: 0 0 150px;
+    color: #888;
+    padding-right: 12px;
+}
+.tz-d-value {
+    flex: 1 1 auto;
+    color: #333;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
 /* 分页 */
 .tz-pager {
     display: flex;
