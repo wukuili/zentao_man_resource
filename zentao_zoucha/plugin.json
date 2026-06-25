@@ -1,0 +1,12 @@
+{
+    "code": "zoucha",
+    "name": "项目走查",
+    "version": "1.0",
+    "zentaoVersion": ">=20.0",
+    "author": "李永杰",
+    "email": "wukuili@gmail.com",
+    "description": "项目走查（健康度体检）插件：扫描所有进行中项目，按 5 条规则筛出无任务、近一周未更新、任务延期、无迭代、任务超期的失管项目，支持按问题类型筛选与导出。",
+    "type": "extension",
+    "depend": [],
+    "incompatible": []
+}

@@ -1,0 +1,21 @@
+# 基本信息。
+name: 项目走查
+code: zoucha
+type: extension
+copyright: 神思电子技术股份有限公司 2026
+site: https://www.sdses.com
+author: 李永杰
+abstract: 禅道项目走查（健康度体检）插件
+# 描述和安装文档
+desc: |
+  禅道项目走查插件，自动扫描所有进行中项目，按 5 条规则筛出"失管"项目：无任务、任务近一周未更新、任务延期、无迭代/里程碑、任务持续时间超 2 周。一屏定位需要关注的项目，支持按问题类型筛选与导出。
+install: |
+  后台本地安装
+
+# 版本信息。
+releases:
+  1.0:
+    zentaoversion: 20.0+,biz10.0+,max5.0+,ipd2.0+
+    charge: free
+    changelog: 初始版本，支持 5 条走查规则、问题类型筛选、CSV 导出。
+    date: 2026-06-25
