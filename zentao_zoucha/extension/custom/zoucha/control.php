@@ -113,6 +113,13 @@ class zoucha extends control
         /* 规则标签映射 */
         $ruleList = isset($this->lang->zoucha->ruleList) ? (array)$this->lang->zoucha->ruleList : array();
 
+        /* CSV 公式注入防护：单元格首字符为 = + - @ 时前置单引号，避免 Excel 当作公式执行 */
+        $csvSafe = function($v) {
+            $v = (string)$v;
+            if($v !== '' && strpos('=+-@', $v[0]) !== false) $v = "'" . $v;
+            return $v;
+        };
+
         /* 输出 CSV */
         $filename = 'zoucha-' . date('Ymd-His') . '.csv';
         header('Content-Type: text/csv; charset=utf-8');
@@ -138,10 +145,10 @@ class zoucha extends control
 
             fputcsv($out, array(
                 $i++,
-                $row->projectName,
-                $row->programName !== '' ? $row->programName : '-',
-                $row->pmName,
-                $row->statusName,
+                $csvSafe($row->projectName),
+                $row->programName !== '' ? $csvSafe($row->programName) : '-',
+                $csvSafe($row->pmName),
+                $csvSafe($row->statusName),
                 implode('、', $hitLabels),
                 $row->taskCount,
                 $row->overdueCount,
