@@ -17,7 +17,7 @@
 | # | 规则键 | 标签 | 判定口径 |
 |---|---|---|---|
 | R1 | `noTask` | 无任务 | 项目下（未关闭执行内、未删除）任务总数 = 0 |
-| R2 | `stale` | 近一周未更新 | 项目**有**任务，但全部**未关闭状态**任务的 `lastEditedDate` 均早于 N 天前（默认 N=7） |
+| R2 | `stale` | 近一周未更新 | 项目**有**任务，但全部**未关闭状态**任务的最近活动日期均早于 N 天前（默认 N=7）。最近活动日期取 `openedDate` 与 `lastEditedDate` 中较晚的有效值——新建从未编辑的任务用 `openedDate`，避免当天创建即被判为过期。 |
 | R3 | `overdue` | 任务延期 | 存在 `deadline` < 今天 且状态非 `done`/`closed`/`cancel` 的任务，逾期任务数 ≥ `overdueMin`（默认 1）。标签附带逾期任务数。 |
 | R4 | `noExecution` | 无迭代 | 项目下没有任何执行（迭代/阶段，type ∈ sprint/stage/kanban，未删除）。等同“没有里程碑”。 |
 | R5 | `longTask` | 任务超期(>2周) | 存在任务满足 `deadline − estStarted > M 天`（默认 M=14，两端日期均有效） |
