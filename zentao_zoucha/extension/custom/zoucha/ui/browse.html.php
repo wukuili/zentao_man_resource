@@ -30,7 +30,6 @@ toolbar
 );
 
 /* ── 筛选栏 HTML ── */
-$ruleParam = ($rule === '') ? 'all' : $rule;
 $filterHTML  = '<div class="zc-filter-bar">';
 $filterHTML .= '<label>' . htmlspecialchars($lang->zoucha->filterRule) . '</label>';
 $filterHTML .= '<select id="zcFilterRule" class="form-control" style="max-width:180px">';
