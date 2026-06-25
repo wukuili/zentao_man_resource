@@ -1,1 +1,26 @@
-/* 项目走查样式（Task 5 填充） */
+.zoucha-page .panel-body { padding: 0 !important; }
+.zoucha-page { overflow-x: auto; }
+
+.zc-filter-bar { display:flex; align-items:center; gap:6px; padding:10px 14px; border-bottom:1px solid #eee; flex-wrap:wrap; }
+.zc-filter-bar label { margin:0; font-size:13px; color:#555; }
+.zc-summary { margin-left:auto; font-size:13px; color:#333; }
+.zc-summary strong { color:#c0392b; font-size:15px; }
+
+.zc-table-wrap { width:100%; }
+.zc-table { width:100%; border-collapse:collapse; font-size:13px; }
+.zc-table th, .zc-table td { border:1px solid #eaeaea; padding:7px 9px; vertical-align:middle; }
+.zc-table th { background:#fafafa; font-weight:600; color:#444; white-space:nowrap; }
+.zc-table .td-center { text-align:center; }
+.zc-table tbody tr:hover { background:#f7fbff; }
+.zc-row-danger { background:#fff5f5; }
+.zc-row-danger:hover { background:#ffecec; }
+
+.zc-tag { display:inline-block; color:#fff; font-size:12px; line-height:18px; padding:1px 8px; border-radius:10px; margin:2px 4px 2px 0; white-space:nowrap; }
+.zc-num-danger { color:#c0392b; font-weight:600; }
+.zc-na { color:#bbb; }
+.zc-project-link { color:#2680eb; }
+.zc-empty { text-align:center; color:#999; padding:30px 0 !important; }
+
+.zc-pager { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-top:1px solid #eee; flex-wrap:wrap; gap:8px; }
+.zc-pager-info { font-size:13px; color:#666; }
+.zc-pager-actions .btn { margin-left:4px; }
