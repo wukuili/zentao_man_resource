@@ -52,19 +52,13 @@ class zouchaModel extends model
 
         /* 构建辅助映射 */
         $closedExecutionIDs = array(); // id => true，已关闭执行
-        $execCountByProject = array(); // projectID => 未关闭执行数
+        $execCountByProject = array(); // projectID => 未删除执行总数（含已关闭）——R4 需全量
         foreach($executions as $exec)
         {
             $pid = (int)$exec->project;
-            if($exec->status === 'closed')
-            {
-                $closedExecutionIDs[$exec->id] = true;
-            }
-            else
-            {
-                if(!isset($execCountByProject[$pid])) $execCountByProject[$pid] = 0;
-                $execCountByProject[$pid]++;
-            }
+            if(!isset($execCountByProject[$pid])) $execCountByProject[$pid] = 0;
+            $execCountByProject[$pid]++;                               // 全量计数
+            if($exec->status === 'closed') $closedExecutionIDs[$exec->id] = true;
         }
 
         /* ── 4. 取任务（所有未删除任务，稍后按执行过滤） ── */
@@ -167,7 +161,7 @@ class zouchaModel extends model
             }
 
             $pmAccount  = (string)$proj->PM;
-            $results[] = array(
+            $results[] = (object) array(
                 'projectID'      => $pid,
                 'projectName'    => (string)$proj->name,
                 'pm'             => $pmAccount,
@@ -181,7 +175,7 @@ class zouchaModel extends model
                 /* 富化字段 */
                 'pmName'         => isset($pmNames[$pmAccount]) ? $pmNames[$pmAccount] : $pmAccount,
                 'statusName'     => isset($statusList[$proj->status]) ? $statusList[$proj->status] : (string)$proj->status,
-                'programName'    => implode(' / ', $programChain),
+                'programName'    => implode('/', $programChain),
             );
         }
 
@@ -229,17 +223,9 @@ class zouchaModel extends model
             ->fetchAll('id');
 
         $closedExecutionIDs = array();
-        $openExecCount      = 0;
         foreach($executions as $exec)
         {
-            if($exec->status === 'closed')
-            {
-                $closedExecutionIDs[$exec->id] = true;
-            }
-            else
-            {
-                $openExecCount++;
-            }
+            if($exec->status === 'closed') $closedExecutionIDs[$exec->id] = true;
         }
 
         /* 取任务（含过滤） */
@@ -259,7 +245,7 @@ class zouchaModel extends model
 
         $evaluated = zouchaRules::evaluate(
             $filteredTasks,
-            $openExecCount,
+            count($executions),
             $today,
             $staleDays,
             $longTaskDays,
