@@ -94,5 +94,26 @@ check('停用 overdue 后不命中', !in_array('overdue', $r['hits'], true));
 $r = zouchaRules::evaluate(array(task('doing', '0000-00-00', '0000-00-00', '2026-06-24 09:00:00', '2026-06-24 09:00:00')), 1, $today, 7, 14, 1, $all);
 check('脏日期不触发 overdue/longTask', !in_array('overdue', $r['hits'], true) && !in_array('longTask', $r['hits'], true));
 
+/* R2 边界：最近活动恰好在 staleDays 天前(staleCutoff=2026-06-18)时不命中（实现用严格 <） */
+$tasks = array(task('doing', '2026-05-01', '2026-07-01', '2026-06-18 09:00:00', '2026-06-18 09:00:00'));
+$r = zouchaRules::evaluate($tasks, 1, $today, 7, 14, 1, $all);
+check('R2 恰好 staleDays 天前不命中', !in_array('stale', $r['hits'], true));
+
+/* R5 边界：跨度恰好 14 天(06-01→06-15)时不命中（实现用严格 >） */
+$r = zouchaRules::evaluate(array(task('doing', '2026-06-01', '2026-06-15', '2026-06-24 09:00:00', '2026-06-24 09:00:00')), 1, $today, 7, 14, 1, $all);
+check('R5 恰好 14 天不命中', !in_array('longTask', $r['hits'], true));
+
+/* R3 负向：已取消/已关闭的逾期任务不计入逾期 */
+$tasks = array(
+    task('cancel', '2026-06-01', '2026-06-10', '2026-06-01 09:00:00', '2026-06-01 09:00:00'),
+    task('closed', '2026-06-01', '2026-06-10', '2026-06-01 09:00:00', '2026-06-01 09:00:00'),
+);
+$r = zouchaRules::evaluate($tasks, 1, $today, 7, 14, 1, $all);
+check('R3 取消/关闭的逾期任务不计逾期', $r['overdueCount'] === 0 && !in_array('overdue', $r['hits'], true));
+
+/* R2 对称：全部任务已取消(cancel) → 无未关闭任务，不命中 */
+$r = zouchaRules::evaluate(array(task('cancel', '2026-05-01', '2026-06-01', '2026-05-01 09:00:00', '2026-05-10 09:00:00')), 1, $today, 7, 14, 1, $all);
+check('R2 全取消任务不命中', !in_array('stale', $r['hits'], true));
+
 echo $fail === 0 ? "\nALL PASS\n" : "\n{$fail} FAILED\n";
 exit($fail === 0 ? 0 : 1);

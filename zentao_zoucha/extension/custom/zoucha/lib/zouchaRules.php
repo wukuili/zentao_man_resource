@@ -76,6 +76,7 @@ class zouchaRules
             $hits[] = 'stale';
         }
 
+        /* overdueMin <= 0 时兜底为 1，避免阈值配置异常导致空逾期也命中 */
         if(in_array('overdue', $enabledRules, true) && $overdueCount >= max(1, (int)$overdueMin)) $hits[] = 'overdue';
 
         if(in_array('noExecution', $enabledRules, true) && (int)$executionCount === 0) $hits[] = 'noExecution';
