@@ -18,12 +18,25 @@ class zoucha extends control
     {
         $rule   = ($rule === false || $rule === null) ? '' : (string)$rule;
         $pageID = (int)$pageID;
+
+        /* 禅道 PATH_INFO 模式下查询串参数不会自动绑定到形参，故 POST 读 $_POST、GET 读 $_GET 兜底，
+         * 保证 Task5 的 JS 以 ?rule=...&pageID=... 跳转时筛选/翻页仍生效。 */
+        if($this->server->request_method == 'POST')
+        {
+            $rule   = isset($_POST['rule']) ? (string)$_POST['rule'] : '';
+            $pageID = 1;
+        }
+        else
+        {
+            $rule   = isset($_GET['rule'])   ? (string)$_GET['rule'] : $rule;
+            $pageID = isset($_GET['pageID']) ? (int)$_GET['pageID']  : $pageID;
+        }
         if($rule === 'all') $rule = '';
 
         /* $this->zoucha 是禅道自动加载的 zouchaModel 实例（与控制器同名模型自动注入）。 */
         $allResults = $this->zoucha->inspect();
 
-        /* ── 统计每条规则命中的项目数（用于筛选栏标注数量） ── */
+        /* 统计每条规则命中的项目数（基于全集，不受当前筛选影响） */
         $ruleCounts = array();
         foreach($allResults as $row)
         {
@@ -34,13 +47,13 @@ class zoucha extends control
             }
         }
 
-        /* ── 按规则过滤 ── */
+        /* 按规则过滤 */
         if($rule !== '')
         {
             $filtered = array();
             foreach($allResults as $row)
             {
-                if(in_array($rule, $row->hits)) $filtered[] = $row;
+                if(in_array($rule, $row->hits, true)) $filtered[] = $row;
             }
         }
         else
@@ -48,12 +61,12 @@ class zoucha extends control
             $filtered = $allResults;
         }
 
-        /* ── 分页 ── */
+        /* 分页 */
         $recPerPage = isset($this->config->zoucha->recPerPage) ? (int)$this->config->zoucha->recPerPage : 20;
+        if($recPerPage <= 0) $recPerPage = 20;
         $total      = count($filtered);
-        $pageID     = max(1, $pageID);
         $pageTotal  = $total > 0 ? (int)ceil($total / $recPerPage) : 1;
-        $pageID     = min($pageID, $pageTotal);
+        $pageID     = max(1, min($pageID, $pageTotal));
         $offset     = ($pageID - 1) * $recPerPage;
         $results    = array_slice($filtered, $offset, $recPerPage);
 
@@ -64,6 +77,7 @@ class zoucha extends control
         $this->view->pageTotal  = $pageTotal;
         $this->view->recPerPage = $recPerPage;
         $this->view->total      = $total;
+        $this->view->totalAll   = count($allResults);
         $this->view->ruleCounts = $ruleCounts;
 
         $this->display();
@@ -76,10 +90,10 @@ class zoucha extends control
      */
     public function export($rule = '')
     {
-        $rule = ($rule === false || $rule === null) ? '' : (string)$rule;
+        $rule = isset($_GET['rule']) ? (string)$_GET['rule'] : (string)$rule;
         if($rule === 'all') $rule = '';
 
-        /* $this->zoucha 是禅道自动加载的 zouchaModel 实例（与控制器同名模型自动注入）。 */
+        /* $this->zoucha 是禅道自动加载的 zouchaModel 实例。 */
         $allResults = $this->zoucha->inspect();
 
         /* 按规则过滤 */
@@ -88,7 +102,7 @@ class zoucha extends control
             $rows = array();
             foreach($allResults as $row)
             {
-                if(in_array($rule, $row->hits)) $rows[] = $row;
+                if(in_array($rule, $row->hits, true)) $rows[] = $row;
             }
         }
         else
@@ -110,22 +124,12 @@ class zoucha extends control
         fwrite($out, "\xEF\xBB\xBF");
 
         /* 表头 */
-        fputcsv($out, array(
-            '项目',
-            '所属项目集',
-            '负责人',
-            '项目状态',
-            '走查结果',
-            '任务数',
-            '逾期数',
-            '执行数',
-            '最后任务更新',
-        ));
+        fputcsv($out, array('序号', '项目', '所属项目集', '负责人', '项目状态', '走查结果', '任务数', '逾期数', '执行数', '最后任务更新'));
 
         /* 数据行 */
+        $i = 1;
         foreach($rows as $row)
         {
-            /* 将命中规则键转为中文标签，逗号分隔 */
             $hitLabels = array();
             foreach($row->hits as $h)
             {
@@ -133,15 +137,16 @@ class zoucha extends control
             }
 
             fputcsv($out, array(
+                $i++,
                 $row->projectName,
-                $row->programName,
+                $row->programName !== '' ? $row->programName : '-',
                 $row->pmName,
                 $row->statusName,
-                implode(',', $hitLabels),
+                implode('、', $hitLabels),
                 $row->taskCount,
                 $row->overdueCount,
                 $row->executionCount,
-                $row->lastTaskEdited,
+                $row->lastTaskEdited !== null ? $row->lastTaskEdited : '-',
             ));
         }
 
