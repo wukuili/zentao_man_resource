@@ -21,7 +21,9 @@ $ruleList   = $lang->zoucha->ruleList;
 $ruleColors = $this->config->zoucha->ruleColors;
 
 $exportURL = helper::createLink('zoucha', 'export', "rule={$rule}");
-jsVar('zouchaBrowseURL', helper::createLink('zoucha', 'browse'));
+/* 筛选跳转 URL 模板（用 __RULE__ 占位，JS 替换为实际规则键）。
+ * 用 createLink 带参数生成，禅道 PATH_INFO 模式下路由正确解析位置参数，不依赖 $_GET。 */
+jsVar('window.zouchaFilterURL', helper::createLink('zoucha', 'browse', "rule=__RULE__&pageID=1"));
 
 /* 工具栏 */
 toolbar

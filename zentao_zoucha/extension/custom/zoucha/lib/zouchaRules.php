@@ -50,8 +50,8 @@ class zouchaRules
                 $overdueCount++;
             }
 
-            /* R5 任务跨度 */
-            if($deadline !== null && $estStart !== null)
+            /* R5 任务跨度（排除已关闭/已完成/已取消的任务） */
+            if($deadline !== null && $estStart !== null && !in_array($status, $doneStatuses, true))
             {
                 $spanDays = (strtotime($deadline) - strtotime($estStart)) / 86400;
                 if($spanDays > $longTaskDays) $hasLongTask = true;
