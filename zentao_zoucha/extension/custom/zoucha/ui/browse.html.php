@@ -20,6 +20,17 @@ $totalAll   = (int)$this->view->totalAll;
 $ruleList   = $lang->zoucha->ruleList;
 $ruleColors = $this->config->zoucha->ruleColors;
 
+/* 规则详细说明：用 config 实际阈值填充 lang 模板中的 %d 占位符，用于标签悬停提示 */
+$cfg      = $this->config->zoucha;
+$ruleDesc = $lang->zoucha->ruleDesc;
+$descMap  = array(
+    'noTask'      => $ruleDesc['noTask'],
+    'stale'       => sprintf($ruleDesc['stale'], (int)$cfg->staleDays, (int)$cfg->staleDays, (int)$cfg->staleDays),
+    'overdue'     => sprintf($ruleDesc['overdue'], max(1, (int)$cfg->overdueMin), max(1, (int)$cfg->overdueMin)),
+    'noExecution' => $ruleDesc['noExecution'],
+    'longTask'    => sprintf($ruleDesc['longTask'], (int)$cfg->longTaskDays, (int)$cfg->longTaskDays),
+);
+
 $exportURL = helper::createLink('zoucha', 'export', "rule={$rule}");
 /* 筛选跳转 URL 模板（用 __RULE__ 占位，JS 替换为实际规则键）。
  * 用 createLink 带参数生成，禅道 PATH_INFO 模式下路由正确解析位置参数，不依赖 $_GET。 */
@@ -41,7 +52,9 @@ foreach($ruleList as $key => $label)
     if(!in_array($key, $this->config->zoucha->rules, true)) continue;
     $cnt = isset($ruleCounts[$key]) ? (int)$ruleCounts[$key] : 0;
     $sel = ($rule === $key) ? ' selected' : '';
-    $filterHTML .= '<option value="' . htmlspecialchars((string)$key) . '"' . $sel . '>' . htmlspecialchars($label) . '（' . $cnt . '）</option>';
+    /* 原生 title 提示：取规则说明，换行压成一行更适合 title 展示 */
+    $optTip = isset($descMap[$key]) ? ' title="' . htmlspecialchars(str_replace("\n", '　', $descMap[$key])) . '"' : '';
+    $filterHTML .= '<option value="' . htmlspecialchars((string)$key) . '"' . $sel . $optTip . '>' . htmlspecialchars($label) . '（' . $cnt . '）</option>';
 }
 $filterHTML .= '</select>';
 $filterHTML .= '<button type="button" class="btn btn-primary btn-sm" onclick="zcSubmitFilter()" style="margin-left:8px">' . htmlspecialchars($lang->zoucha->filterSearch) . '</button>';
@@ -82,8 +95,11 @@ else
         {
             $color = isset($ruleColors[$h]) ? $ruleColors[$h] : '#888';
             $label = zget($ruleList, $h, $h);
+            $name  = zget($ruleList, $h, $h);
             if($h === 'overdue' && $row->overdueCount > 0) $label .= ' ' . $row->overdueCount;
-            $tags .= '<span class="zc-tag" style="background:' . htmlspecialchars($color) . '">' . htmlspecialchars($label) . '</span>';
+            /* data-tip：规则名 + 详细说明，JS 悬停时弹出浮层（white-space:pre-line 保留换行） */
+            $tip = $name . "\n" . (isset($descMap[$h]) ? $descMap[$h] : '');
+            $tags .= '<span class="zc-tag" data-tip="' . htmlspecialchars($tip) . '" style="background:' . htmlspecialchars($color) . '">' . htmlspecialchars($label) . '</span>';
         }
 
         /* 命中规则越多越醒目 */

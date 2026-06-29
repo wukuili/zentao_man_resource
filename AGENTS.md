@@ -2,110 +2,83 @@
 
 This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
-## Project Overview
+## Repository Overview
 
-**man_resource** is a ZenTao 20+ extension plugin (人力资源日历 — Human Resource Calendar) that provides resource workload visibility across org, project, and member dimensions. It includes load rate analysis, conflict detection, Monte Carlo completion prediction, load simulation, and REST API endpoints.
+This is a **monorepo of independent ZenTao 20.0 / 22.x open-edition extension plugins** (神思电子 secondary development). Each top-level `zentao_*` / `man_resource` directory is a self-contained plugin that installs separately into a ZenTao PMS instance. There is no shared build — each plugin ships its own `doc/zh-cn.yaml` manifest, `plugin.json`, `db/*.sql`, `config/ext/`, and `extension/custom/` tree.
 
-The plugin lives in `man_resource/` at repo root. A reference implementation (resourcecalendar v2.6) exists in `plan/m_6a166e4635ce2resourcecalendar2.6/`. The full ZenTao PMS 20.0 source is in `plan/ZenTaoPMS-20.0-php8.1/` for framework reference.
+| Directory | code | Plugin | Summary |
+|-----------|------|--------|---------|
+| `man_resource/` | `man_resource` | 人力资源日历 | Per-member workload/load-rate across org/project/member dimensions; conflict detection, Monte Carlo prediction, load simulation, REST API |
+| `zentao_taizhang/` | `taizhang` | 项目台账 | Multi-filter project ledger with cost/profit metrics and over-budget warnings; **own top-level main-nav entry** |
+| `zentao_waibao/` | `waibao` | 外包工时 | "Is outsourced" person tag + separate outsourced/in-house hour statistics |
+| `zentao_crm/` | `crmsync` | CRM对接 | Webhook/REST sync with external CRM; auto-creates projects on deal-won, syncs amounts into project + `zt_taizhang` |
+| `zentao_zoucha/` | `zoucha` | 项目走查 | Scans in-progress projects against 5 "neglected project" rules; pure rule engine is unit-tested |
 
-## Plugin Structure
+`plan/` (git-ignored) holds reference-only material: the resourcecalendar v2.6 reference plugin and the full ZenTao PMS 20.0 PHP 8.1 source for framework lookups — **not** a running instance.
 
-```
-man_resource/
-├── db/install.sql                          # Database schema (zt_resource_calendar, zt_load_simulation)
-├── doc/zh-cn.yaml                         # Plugin manifest (name, version, compatibility)
-├── config/ext/man_resource.php             # Route/filter config (openMethods, logonMethods, programPriv)
-├── www/js/zui/resourcecalendar/            # Frontend assets (min.js, min.css)
-├── extension/custom/
-│   ├── common/ext/config/man_resource.php  # App registration (apps, appsMenu, includedPriv)
-│   ├── common/ext/lang/zh-cn/man_resource.php  # Nav menu integration (system/scrum/waterfall)
-│   ├── group/ext/config/man_resource.php   # Privilege package registration
-│   ├── group/ext/lang/zh-cn/man_resource.php   # View-level permission resource
-│   ├── project/ext/config/man_resource.php # Project-scope privilege wiring
-│   └── man_resource/                      # Main module
-│       ├── config.php                      # Load range config, colors, table constants
-│       ├── control.php                    # Controller (all HTTP methods)
-│       ├── model.php                      # Model (all business logic)
-│       ├── lang/zh-cn.php                # Chinese language strings + permission resource defs
-│       ├── css/man_resource.css           # Minimal CSS overrides
-│       ├── js/man_resource.js             # Client-side JS (currently empty init)
-│       ├── ui/                             # ZIN DSL templates (ZenTao 20+ native UI)
-│       │   ├── orgdimension.html.php
-│       │   ├── projectdimension.html.php
-│       │   ├── memberdimension.html.php
-│       │   ├── sethours.html.php
-│       │   ├── setload.html.php
-│       │   ├── setpredicthours.html.php
-│       │   └── browse.html.php
-│       └── view/                           # Legacy PHP templates (pre-ZIN fallback)
-│           ├── orgdimension.html.php
-│           ├── projectdimension.html.php
-│           ├── memberdimension.html.php
-│           ├── sethours.html.php
-│           ├── setload.html.php
-│           ├── setpredicthours.html.php
-│           ├── simulate.html.php
-│           ├── snapshot.html.php
-│           ├── prediction.html.php
-│           ├── export.html.php
-│           └── browse.html.php
+## Build, Pack & Deploy
+
+There is no compiler or package manager. "Building" = packing a plugin directory into a distributable zip; "running" = copying files into a live ZenTao instance and clearing its cache.
+
+```powershell
+# Pack crmsync / taizhang / zoucha into dist/<code>-<version>.zip (version from plugin.json)
+pwsh ./pack_plugins.ps1
 ```
 
-## Key Architecture Patterns
+```bash
+# Deploy into a local zbox ZenTao under WSL (run as root). These scripts copy files,
+# seed tokens, run db/*.sql, then clear tmp/cache + tmp/model.
+bash deploy_crmsync.sh
+bash deploy_taizhang_sync.sh   # adds amount columns, redeploys taizhang, then calls deploy_crmsync.sh
+```
 
-### ZenTao 20+ Extension Convention
-- **ZIN templates (`ui/`) take priority** over legacy views (`view/`) when both exist. ZIN uses `namespace zin;` with DSL functions like `dtable()`, `panel()`, `featureBar()`, `toolbar()`, `picker()`, `select()`, `datePicker()`.
-- **Date params in URLs** use `_` instead of `-` (e.g. `2026_05_28`) due to ZenTao routing, then converted back in controller via `str_replace('_', '-', ...)`.
-- **Extension hooks** are wired via `extension/custom/{module}/ext/{type}/man_resource.php` files that inject into existing ZenTao modules (common, group, project) without modifying core files.
-- **Config cascade**: Plugin `config.php` → `extension/custom/common/ext/config/` → `config/ext/` — later entries override earlier ones.
+**Manual deploy of any plugin** (the part the scripts automate):
+```
+{plugin}/extension/*       → {zentao}/extension/*
+{plugin}/config/ext/*.php  → {zentao}/config/ext/*.php
+{plugin}/db/install.sql    → import into DB (first install only)
+```
+Then **clear `{zentao}/tmp/cache/*` and `{zentao}/tmp/model/*`** — ZenTao caches the merged lang/config/model and changes will not take effect otherwise. Stale menu 404s and "edits not applying" are almost always an uncleared cache.
 
-### Controller → Model Flow
-- `control.php` methods handle HTTP params, POST processing, date normalization, and delegate to `model.php` for data
-- `model.php` contains all business logic: load calculation, daily series, Gantt data, conflict detection, Monte Carlo simulation, snapshot
-- Both single-person tasks and multi-person (team) tasks are handled — team tasks use `zt_team` table via `getTaskTeamMap()`
+## Testing
 
-### Working Day Calculation
-- Uses `zt_holiday` table to override weekend/holiday classifications (type `holiday` = non-working, type `working` = make-up workday)
-- `collectWorkingDays()` and `shiftWorkingDays()` in model.php are the core date utilities
+- **zoucha** has the only automated test — a zero-dependency PHP harness for the rule engine:
+  ```bash
+  cd zentao_zoucha && php tests/test_rules.php
+  ```
+  It loads `extension/custom/zoucha/lib/zouchaRules.php` directly (no ZenTao runtime) and asserts each of the 5 rules plus boundary/dirty-date cases. **Keep business rules in a framework-free `lib/` class so they stay unit-testable** — this is the pattern to follow for new rule-style logic.
+- Everything else has no automated tests: install into a running ZenTao 20+/22.x instance and exercise each page. `man_resource` exposes a diagnostic endpoint `man_resource-debugTeam?userID=xxx`.
 
-### Load Rate Algorithm
-- Thresholds are configurable: relax(50%), spare(70%), normal(90%), full(100%), over(120%), extreme(>120%)
-- Status modes: `todo` (active tasks, future dates) vs `done` (completed tasks, past dates)
-- Task hour prediction: when `taskHourPredict` is enabled and `left ≤ 0`, falls back to `predictHours` per-task default
-- Non-task todos: when `notTaskHourPredict` is enabled, counts from `zt_todo` table
+## ZenTao Extension Conventions (apply to every plugin)
 
-### REST API
-- Three endpoints: `apiCalendar` (GET), `apiUserDetail` (GET), `apiSimulation` (POST)
-- Auth: either ZenTao session or `X-Resource-Token` header / `?token=` parameter, configured in `$config->man_resource->apiTokens`
-- Routes: `/api/resource/calendar`, `/api/resource/user/detail`, `/api/resource/simulation`
+- **`extension/custom/{module}/ext/{type}/{code}.php` hooks** inject into existing ZenTao modules (`common`, `group`, `project`) without editing core files. `{type}` is `config` or `lang/zh-cn`. The plugin's own module lives at `extension/custom/{code}/` with `control.php`, `model.php`, `config.php`, `lang/zh-cn.php`, `ui/`, optional `view/`, `css/`, `js/`, `lib/`.
+- **Config cascade**: plugin `config.php` → `extension/custom/common/ext/config/` → `config/ext/` — later entries override earlier ones. App registration (`apps`, `appsMenu`, `includedPriv`) goes in `common/ext/config`; privilege packages in `group/ext/config` + `group/ext/lang`.
+- **ZIN templates (`ui/`) take priority** over legacy `view/` PHP templates when both exist. ZIN uses `namespace zin;` with DSL functions (`dtable()`, `panel()`, `featureBar()`, `toolbar()`, `picker()`, `select()`, `datePicker()`).
+- **ZIN `jsVar()` creates a scoped const** — inline `<script>` blocks must read it via a `window.` prefix; ZIN's `js()` helper does not execute at render time, so chart/init data is passed through `jsVar()` + inline script.
+- **Date params in URLs use `_` not `-`** (e.g. `2026_05_28`) because of ZenTao routing; convert back in the controller with `str_replace('_', '-', ...)`.
+- **PATH_INFO routing maps args by position, not name** — `$_GET` won't see named params. Pagination/filter params must be declared as controller method parameters in order.
+- **install/uninstall SQL must not contain `;` inside comments** — ZenTao's `executeDB` splits statements on literal semicolons, so a `;` in a comment yields a 1064 error. Uninstall via `db/uninstall.sql`; it generally drops the plugin's own tables only (do not drop shared ZenTao tables).
+- **Raw XHR POSTs need `X-Requested-With`** — ZenTao 20 redirects (302) non-AJAX POSTs to the app shell (blank page). Add a guard to avoid double-binding when a ZIN script re-runs.
+- **Top-level main-nav** (the outermost 我的地盘/项目集/…/组织/后台 bar) is driven by `$lang->mainNav` and works differently from in-app nav: each item must be the **string** `"标题|模块|方法|"`, and it **must** be registered in `$lang->mainNav->menuOrder[N]` (the renderer only iterates `menuOrder`; pick an `N` that doesn't collide with core 组织=60/后台=65). `zentao_taizhang` is the reference implementation.
 
-### Database Tables
-- `zt_resource_calendar`: snapshots (user_id, project_id, task_id, work_date, estimated_hours, consumed_hours, remain_hours, load_rate, status)
-- `zt_load_simulation`: simulation results (simulation_name, operator, start_date, end_date, result_json, created_at)
-- Both use `zt_` prefix (configurable via `$config->db->prefix`)
-
-## Development Notes
-
-### Adding a New View/Page
-1. Add method to `control.php` following existing patterns (POST handling → locate/redirect, then view data preparation)
-2. Add language strings to `lang/zh-cn.php`
-3. Add privilege resource to `$lang->resource->man_resource` in `lang/zh-cn.php`
-4. Create ZIN template in `ui/{methodname}.html.php` (preferred) and optionally a legacy `view/{methodname}.html.php`
-5. If the page needs nav integration, add to `$lang->man_resource->menu` and the appropriate vision-specific menus in `extension/custom/common/ext/lang/zh-cn/man_resource.php`
-
-### Working with ZenTao Framework
-- `$this->loadModel('module')` loads other ZenTao models (e.g. `dept`, `project`, `user`)
-- `$this->dao->select()->from()->where()->fetchAll()` is the ZenTao DAO query builder
-- `dao::isError()` / `dao::getError()` for DB error checking
+### ZenTao framework API quick reference
+- `$this->loadModel('module')` loads other ZenTao models (`dept`, `project`, `user`, …)
+- `$this->dao->select()->from()->where()->fetchAll()` — DAO query builder; `dao::isError()` / `dao::getError()` for errors
 - `$this->send()` returns JSON; `$this->locate()` redirects; `$this->display()` renders the view
-- `helper::isAjaxRequest()` detects AJAX calls
-- `zget()` is ZenTao's null-safe array/object accessor
-- `common::hasPriv()` checks user permissions; `createLink()` / `inlink()` build URLs
-
-### Charts
+- `helper::isAjaxRequest()`; `zget()` null-safe accessor; `common::hasPriv()` permission check; `createLink()` / `inlink()` URL builders
 - ECharts is loaded dynamically via `loadEcharts()` in ZIN templates
-- Chart data is passed via `jsVar()` in ZIN and inline `<script>` blocks (ZIN's `js()` helper does not execute at render time)
 
-### Testing
-- No automated test suite exists. Test by installing the plugin into a running ZenTao 20+ instance and exercising each dimension page.
-- The `debugTeam()` method in control.php provides a diagnostic endpoint: `man_resource-debugTeam?userID=xxx`
+## man_resource Specifics (the largest plugin)
+
+- **Controller → Model split**: `control.php` handles HTTP params, POST processing, date normalization, and delegates to `model.php`, which holds all business logic (load calculation, daily series, Gantt, conflict detection, Monte Carlo simulation, snapshot). Team (multi-person) tasks use `zt_team` via `getTaskTeamMap()`.
+- **Working days** come from `zt_holiday` (type `holiday` = non-working, type `working` = make-up day); `collectWorkingDays()` / `shiftWorkingDays()` are the core utilities.
+- **Load-rate thresholds** are configurable: relax 50% / spare 70% / normal 90% / full 100% / over 120% / extreme >120%. Modes: `todo` (active tasks, future dates) vs `done` (completed, past). When `taskHourPredict` is on and `left ≤ 0` it falls back to per-task `predictHours`; `notTaskHourPredict` counts non-task todos from `zt_todo`.
+- **Closed projects/executions are excluded** from all statistics.
+- **REST API**: `apiCalendar` (GET), `apiUserDetail` (GET), `apiSimulation` (POST) at `/api/resource/{calendar,user/detail,simulation}`. Auth = ZenTao session OR `X-Resource-Token` header / `?token=`, configured in `$config->man_resource->apiTokens`.
+- **Tables**: `zt_resource_calendar` (snapshots), `zt_load_simulation` (simulation results).
+
+### Adding a new view/page (man_resource and similar)
+1. Add a method to `control.php` (POST handling → `locate`/redirect, then prepare view data).
+2. Add language strings to `lang/zh-cn.php` and a privilege resource to `$lang->resource->{code}`.
+3. Create `ui/{method}.html.php` (preferred); optionally a legacy `view/{method}.html.php`.
+4. For nav integration, add to `$lang->{code}->menu` and the vision-specific menus in `extension/custom/common/ext/lang/zh-cn/{code}.php`.

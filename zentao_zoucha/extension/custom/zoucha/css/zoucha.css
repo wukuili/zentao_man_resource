@@ -15,7 +15,18 @@
 .zc-row-danger { background:#fff5f5; }
 .zc-row-danger:hover { background:#ffecec; }
 
-.zc-tag { display:inline-block; color:#fff; font-size:12px; line-height:18px; padding:1px 8px; border-radius:10px; margin:2px 4px 2px 0; white-space:nowrap; }
+.zc-tag { display:inline-block; color:#fff; font-size:12px; line-height:18px; padding:1px 8px; border-radius:10px; margin:2px 4px 2px 0; white-space:nowrap; cursor:help; }
+.zc-tag[data-tip]:hover { box-shadow:0 0 0 2px rgba(0,0,0,.12); }
+
+/* 规则说明浮层（JS 追加到 body，避免被表格 overflow 裁剪） */
+.zc-tip-pop { position:absolute; z-index:9999; max-width:320px; padding:8px 11px; background:rgba(33,33,33,.96); color:#fff;
+    font-size:12px; line-height:1.6; border-radius:6px; box-shadow:0 4px 16px rgba(0,0,0,.28); white-space:pre-line;
+    pointer-events:none; opacity:0; transition:opacity .12s; }
+.zc-tip-pop.show { opacity:1; }
+.zc-tip-pop .zc-tip-title { display:block; font-weight:700; font-size:13px; margin-bottom:3px; }
+.zc-tip-pop::after { content:''; position:absolute; left:var(--arrow-x,16px); bottom:-6px; border:6px solid transparent;
+    border-top-color:rgba(33,33,33,.96); border-bottom:0; }
+.zc-tip-pop.below::after { top:-6px; bottom:auto; border-top:0; border-bottom-color:rgba(33,33,33,.96); }
 .zc-num-danger { color:#c0392b; font-weight:600; }
 .zc-na { color:#bbb; }
 .zc-project-link { color:#2680eb; }

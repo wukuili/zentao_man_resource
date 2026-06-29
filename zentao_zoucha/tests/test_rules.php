@@ -115,5 +115,13 @@ check('R3 取消/关闭的逾期任务不计逾期', $r['overdueCount'] === 0 &&
 $r = zouchaRules::evaluate(array(task('cancel', '2026-05-01', '2026-06-01', '2026-05-01 09:00:00', '2026-05-10 09:00:00')), 1, $today, 7, 14, 1, $all);
 check('R2 全取消任务不命中', !in_array('stale', $r['hits'], true));
 
+/* R3 负向：暂停(pause)任务即使过期也不计逾期 */
+$tasks = array(
+    task('pause', '2026-06-01', '2026-06-10', '2026-06-01 09:00:00', '2026-06-01 09:00:00'), // 已暂停且过期
+    task('doing', '2026-06-01', '2026-06-10', '2026-06-01 09:00:00', '2026-06-20 09:00:00'), // 进行中且过期=逾期
+);
+$r = zouchaRules::evaluate($tasks, 1, $today, 7, 14, 1, $all);
+check('R3 暂停任务不计逾期（仅 doing 计 1）', $r['overdueCount'] === 1);
+
 echo $fail === 0 ? "\nALL PASS\n" : "\n{$fail} FAILED\n";
 exit($fail === 0 ? 0 : 1);

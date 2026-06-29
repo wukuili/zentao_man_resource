@@ -20,7 +20,8 @@ class zouchaRules
      */
     public static function evaluate($tasks, $executionCount, $today, $staleDays, $longTaskDays, $overdueMin, $enabledRules)
     {
-        $doneStatuses   = array('done', 'closed', 'cancel'); // 不算逾期
+        $doneStatuses   = array('done', 'closed', 'cancel'); // 不算逾期（R5 跨度沿用）
+        $overdueExclude = array('done', 'closed', 'cancel', 'pause'); // R3 逾期：已完成/关闭/取消外，暂停(挂起)任务也不算逾期
         $closedStatuses = array('closed', 'cancel');         // R2 视为"已关闭状态"
 
         $taskCount   = count($tasks);
@@ -44,8 +45,8 @@ class zouchaRules
                                      self::cleanDateTime(self::val($t, 'lastEditedDate')));
             if($activity !== null) $globalActivityMax = self::maxStr($globalActivityMax, $activity);
 
-            /* R3 逾期 */
-            if($deadline !== null && strtotime($deadline) < $todayTs && !in_array($status, $doneStatuses, true))
+            /* R3 逾期（暂停任务不计） */
+            if($deadline !== null && strtotime($deadline) < $todayTs && !in_array($status, $overdueExclude, true))
             {
                 $overdueCount++;
             }
