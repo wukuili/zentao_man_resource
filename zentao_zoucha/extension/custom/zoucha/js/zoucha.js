@@ -4,15 +4,19 @@
 function zcSubmitFilter()
 {
     var rule = document.getElementById('zcFilterRule').value || 'all';
+    var pmEl = document.getElementById('zcFilterPM');
+    var pm   = (pmEl && pmEl.value) ? pmEl.value : 'all';
     var url = (typeof window.zouchaFilterURL !== 'undefined') ? window.zouchaFilterURL : '';
     if(!url) { location.reload(); return; }
-    location.href = url.replace('__RULE__', encodeURIComponent(rule));
+    location.href = url.replace('__RULE__', encodeURIComponent(rule)).replace('__PM__', encodeURIComponent(pm));
 }
 
 function zcResetFilter()
 {
-    var sel = document.getElementById('zcFilterRule');
-    if(sel) sel.value = 'all';
+    var ruleEl = document.getElementById('zcFilterRule');
+    if(ruleEl) ruleEl.value = 'all';
+    var pmEl = document.getElementById('zcFilterPM');
+    if(pmEl) pmEl.value = 'all';
     zcSubmitFilter();
 }
 

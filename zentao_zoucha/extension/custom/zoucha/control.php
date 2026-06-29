@@ -12,32 +12,40 @@ class zoucha extends control
      * 分页参数 $pageID 必须声明为形参，否则翻页链接永远落在第 1 页。
      *
      * @param string $rule   问题类型过滤（规则键；'' 或 'all' 表示全部）
+     * @param string $pm     项目经理过滤（PM 账号；'' 或 'all' 表示全部，'__none__' 表示未指派）
      * @param int    $pageID 页码
      */
-    public function browse($rule = '', $pageID = 1)
+    public function browse($rule = '', $pm = '', $pageID = 1)
     {
         $rule   = ($rule === false || $rule === null) ? '' : (string)$rule;
+        $pm     = ($pm   === false || $pm   === null) ? '' : (string)$pm;
         $pageID = (int)$pageID;
 
         /* 禅道 PATH_INFO 模式下查询串参数不会自动绑定到形参，故 POST 读 $_POST、GET 读 $_GET 兜底，
-         * 保证 Task5 的 JS 以 ?rule=...&pageID=... 跳转时筛选/翻页仍生效。 */
+         * 保证 Task5 的 JS 以 ?rule=...&pm=...&pageID=... 跳转时筛选/翻页仍生效。 */
         if($this->server->request_method == 'POST')
         {
             $rule   = isset($_POST['rule']) ? (string)$_POST['rule'] : '';
+            $pm     = isset($_POST['pm'])   ? (string)$_POST['pm']   : '';
             $pageID = 1;
         }
         else
         {
             $rule   = isset($_GET['rule'])   ? (string)$_GET['rule'] : $rule;
+            $pm     = isset($_GET['pm'])     ? (string)$_GET['pm']   : $pm;
             $pageID = isset($_GET['pageID']) ? (int)$_GET['pageID']  : $pageID;
         }
         if($rule === 'all') $rule = '';
+        if($pm   === 'all') $pm   = '';
 
         /* $this->zoucha 是禅道自动加载的 zouchaModel 实例（与控制器同名模型自动注入）。 */
         $allResults = $this->zoucha->inspect();
 
-        /* 统计每条规则命中的项目数（基于全集，不受当前筛选影响） */
+        /* 统计每条规则命中的项目数 + 每个项目经理的问题项目数（均基于全集，不受当前筛选影响）。
+         * pmCounts 以 PM 账号为键（空账号即未指派）；pmNames 维护 账号=>真实姓名 供下拉展示。 */
         $ruleCounts = array();
+        $pmCounts   = array();
+        $pmNames    = array();
         foreach($allResults as $row)
         {
             foreach($row->hits as $h)
@@ -45,20 +53,22 @@ class zoucha extends control
                 if(!isset($ruleCounts[$h])) $ruleCounts[$h] = 0;
                 $ruleCounts[$h]++;
             }
+            $pmKey = (string)$row->pm;
+            if(!isset($pmCounts[$pmKey])) $pmCounts[$pmKey] = 0;
+            $pmCounts[$pmKey]++;
+            if(!isset($pmNames[$pmKey])) $pmNames[$pmKey] = (string)$row->pmName;
         }
+        /* 下拉项按问题项目数降序，问题多的项目经理排在前面 */
+        arsort($pmCounts);
 
-        /* 按规则过滤 */
-        if($rule !== '')
+        /* 按规则 + 项目经理过滤（'__none__' 匹配空账号的未指派项目） */
+        $pmMatch  = ($pm === '__none__') ? '' : $pm;
+        $filtered = array();
+        foreach($allResults as $row)
         {
-            $filtered = array();
-            foreach($allResults as $row)
-            {
-                if(in_array($rule, $row->hits, true)) $filtered[] = $row;
-            }
-        }
-        else
-        {
-            $filtered = $allResults;
+            if($rule !== '' && !in_array($rule, $row->hits, true)) continue;
+            if($pm   !== '' && (string)$row->pm !== $pmMatch)      continue;
+            $filtered[] = $row;
         }
 
         /* 分页 */
@@ -73,12 +83,15 @@ class zoucha extends control
         $this->view->title      = $this->lang->zoucha->browse;
         $this->view->results    = $results;
         $this->view->rule       = $rule;
+        $this->view->pm         = $pm;
         $this->view->pageID     = $pageID;
         $this->view->pageTotal  = $pageTotal;
         $this->view->recPerPage = $recPerPage;
         $this->view->total      = $total;
         $this->view->totalAll   = count($allResults);
         $this->view->ruleCounts = $ruleCounts;
+        $this->view->pmCounts   = $pmCounts;
+        $this->view->pmNames    = $pmNames;
 
         $this->display();
     }
@@ -87,27 +100,26 @@ class zoucha extends control
      * 导出走查结果为 CSV 文件。
      *
      * @param string $rule 同 browse()，空串表示全部
+     * @param string $pm   同 browse()，空串表示全部，'__none__' 表示未指派
      */
-    public function export($rule = '')
+    public function export($rule = '', $pm = '')
     {
         $rule = isset($_GET['rule']) ? (string)$_GET['rule'] : (string)$rule;
+        $pm   = isset($_GET['pm'])   ? (string)$_GET['pm']   : (string)$pm;
         if($rule === 'all') $rule = '';
+        if($pm   === 'all') $pm   = '';
 
         /* $this->zoucha 是禅道自动加载的 zouchaModel 实例。 */
         $allResults = $this->zoucha->inspect();
 
-        /* 按规则过滤 */
-        if($rule !== '')
+        /* 按规则 + 项目经理过滤（与 browse() 口径一致） */
+        $pmMatch = ($pm === '__none__') ? '' : $pm;
+        $rows    = array();
+        foreach($allResults as $row)
         {
-            $rows = array();
-            foreach($allResults as $row)
-            {
-                if(in_array($rule, $row->hits, true)) $rows[] = $row;
-            }
-        }
-        else
-        {
-            $rows = $allResults;
+            if($rule !== '' && !in_array($rule, $row->hits, true)) continue;
+            if($pm   !== '' && (string)$row->pm !== $pmMatch)      continue;
+            $rows[] = $row;
         }
 
         /* 规则标签映射 */

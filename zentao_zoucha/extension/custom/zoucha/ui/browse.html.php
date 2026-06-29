@@ -10,7 +10,10 @@ namespace zin;
 
 $results    = $this->view->results;
 $rule       = (string)$this->view->rule;
+$pm         = (string)$this->view->pm;
 $ruleCounts = $this->view->ruleCounts;
+$pmCounts   = $this->view->pmCounts;
+$pmNames    = $this->view->pmNames;
 $pageID     = (int)$this->view->pageID;
 $pageTotal  = (int)$this->view->pageTotal;
 $recPerPage = (int)$this->view->recPerPage;
@@ -31,10 +34,12 @@ $descMap  = array(
     'longTask'    => sprintf($ruleDesc['longTask'], (int)$cfg->longTaskDays, (int)$cfg->longTaskDays),
 );
 
-$exportURL = helper::createLink('zoucha', 'export', "rule={$rule}");
-/* 筛选跳转 URL 模板（用 __RULE__ 占位，JS 替换为实际规则键）。
+$ruleParam = ($rule === '') ? 'all' : $rule;
+$pmParam   = ($pm   === '') ? 'all' : $pm;
+$exportURL = helper::createLink('zoucha', 'export', "rule={$ruleParam}&pm={$pmParam}");
+/* 筛选跳转 URL 模板（用 __RULE__ / __PM__ 占位，JS 替换为实际规则键 / PM 账号）。
  * 用 createLink 带参数生成，禅道 PATH_INFO 模式下路由正确解析位置参数，不依赖 $_GET。 */
-jsVar('window.zouchaFilterURL', helper::createLink('zoucha', 'browse', "rule=__RULE__&pageID=1"));
+jsVar('window.zouchaFilterURL', helper::createLink('zoucha', 'browse', "rule=__RULE__&pm=__PM__&pageID=1"));
 /* 明细弹框 URL 模板（__PID__/__RULE__ 占位，JS 替换） */
 jsVar('window.zouchaDetailURL', helper::createLink('zoucha', 'detail', "projectID=__PID__&rule=__RULE__"));
 
@@ -59,6 +64,23 @@ foreach($ruleList as $key => $label)
     $filterHTML .= '<option value="' . htmlspecialchars((string)$key) . '"' . $sel . $optTip . '>' . htmlspecialchars($label) . '（' . $cnt . '）</option>';
 }
 $filterHTML .= '</select>';
+
+/* 项目经理筛选：选项展示「姓名（问题项目数）」，与问题类型筛选保持一致 */
+$filterHTML .= '<label style="margin-left:12px">' . htmlspecialchars($lang->zoucha->filterPM) . '</label>';
+$filterHTML .= '<select id="zcFilterPM" class="form-control" style="max-width:180px">';
+$filterHTML .= '<option value="all"' . ($pm === '' ? ' selected' : '') . '>' . htmlspecialchars($lang->zoucha->filterAll) . '（' . $totalAll . '）</option>';
+foreach($pmCounts as $acc => $cnt)
+{
+    $acc  = (string)$acc;
+    $val  = ($acc === '') ? '__none__' : $acc;
+    $name = ($acc === '')
+        ? $lang->zoucha->pmNone
+        : ((isset($pmNames[$acc]) && $pmNames[$acc] !== '') ? $pmNames[$acc] : $acc);
+    $sel  = ($pm === $val) ? ' selected' : '';
+    $filterHTML .= '<option value="' . htmlspecialchars($val) . '"' . $sel . '>' . htmlspecialchars($name) . '（' . (int)$cnt . '）</option>';
+}
+$filterHTML .= '</select>';
+
 $filterHTML .= '<button type="button" class="btn btn-primary btn-sm" onclick="zcSubmitFilter()" style="margin-left:8px">' . htmlspecialchars($lang->zoucha->filterSearch) . '</button>';
 $filterHTML .= '<button type="button" class="btn btn-default btn-sm" onclick="zcResetFilter()">' . htmlspecialchars($lang->zoucha->filterReset) . '</button>';
 $filterHTML .= '<span class="zc-summary">' . htmlspecialchars($lang->zoucha->totalFlagged) . '：<strong>' . $total . '</strong></span>';
@@ -129,9 +151,8 @@ else
 $tableHTML .= '</tbody></table></div>';
 
 /* ── 分页器 ── */
-$buildPageURL = function($targetPage) use ($rule) {
-    $ruleParam = ($rule === '') ? 'all' : $rule;
-    return helper::createLink('zoucha', 'browse', "rule={$ruleParam}&pageID={$targetPage}");
+$buildPageURL = function($targetPage) use ($ruleParam, $pmParam) {
+    return helper::createLink('zoucha', 'browse', "rule={$ruleParam}&pm={$pmParam}&pageID={$targetPage}");
 };
 $pagerHTML  = '<div class="zc-pager">';
 $pagerHTML .= '<span class="zc-pager-info">共 ' . $total . ' 条，每页 ' . $recPerPage . ' 条，第 ' . $pageID . ' / ' . $pageTotal . ' 页</span>';

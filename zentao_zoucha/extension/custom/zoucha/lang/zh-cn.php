@@ -47,6 +47,8 @@ $lang->zoucha->colLastEdited = '最后任务更新';
 
 /* 按钮与提示 */
 $lang->zoucha->filterRule   = '问题类型';
+$lang->zoucha->filterPM     = '项目经理';
+$lang->zoucha->pmNone       = '未指派';
 $lang->zoucha->filterAll    = '全部';
 $lang->zoucha->filterSearch = '查询';
 $lang->zoucha->filterReset  = '重置';
