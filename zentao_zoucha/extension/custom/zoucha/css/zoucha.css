@@ -27,6 +27,28 @@
 .zc-tip-pop::after { content:''; position:absolute; left:var(--arrow-x,16px); bottom:-6px; border:6px solid transparent;
     border-top-color:rgba(33,33,33,.96); border-bottom:0; }
 .zc-tip-pop.below::after { top:-6px; bottom:auto; border-top:0; border-bottom-color:rgba(33,33,33,.96); }
+
+/* 可点击的标签（点开明细弹框） */
+.zc-tag-clickable { cursor:pointer; }
+.zc-tag-clickable:hover { filter:brightness(1.08); }
+
+/* 明细弹框 */
+.zc-modal-mask { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:10000; display:flex; align-items:center; justify-content:center; }
+.zc-modal { background:#fff; border-radius:8px; width:760px; max-width:92vw; max-height:84vh; display:flex; flex-direction:column; box-shadow:0 12px 40px rgba(0,0,0,.3); overflow:hidden; }
+.zc-modal-head { display:flex; align-items:center; gap:8px; padding:12px 16px; border-bottom:1px solid #eee; }
+.zc-modal-head h3 { margin:0; font-size:15px; color:#333; font-weight:600; flex:1; }
+.zc-modal-head .zc-modal-badge { font-size:12px; color:#fff; padding:1px 8px; border-radius:10px; }
+.zc-modal-head .zc-modal-count { font-size:12px; color:#888; }
+.zc-modal-close { cursor:pointer; border:0; background:none; font-size:20px; line-height:1; color:#999; padding:0 4px; }
+.zc-modal-close:hover { color:#333; }
+.zc-modal-body { padding:0; overflow:auto; }
+.zc-modal-body table { width:100%; border-collapse:collapse; font-size:13px; }
+.zc-modal-body th, .zc-modal-body td { border-bottom:1px solid #f0f0f0; padding:8px 12px; text-align:left; vertical-align:middle; }
+.zc-modal-body th { background:#fafafa; color:#555; font-weight:600; position:sticky; top:0; white-space:nowrap; }
+.zc-modal-body tbody tr:hover { background:#f7fbff; }
+.zc-modal-body .zc-task-link { color:#2680eb; }
+.zc-modal-empty { padding:28px 16px; text-align:center; color:#888; font-size:13px; line-height:1.7; }
+.zc-modal-loading { padding:28px 16px; text-align:center; color:#999; font-size:13px; }
 .zc-num-danger { color:#c0392b; font-weight:600; }
 .zc-na { color:#bbb; }
 .zc-project-link { color:#2680eb; }

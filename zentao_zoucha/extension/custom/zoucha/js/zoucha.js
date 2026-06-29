@@ -94,3 +94,111 @@ function zcResetFilter()
     });
     window.addEventListener('scroll', hideTip, true);
 })();
+
+/* ── 点击规则标签 → 弹框展示明细列表 ── */
+(function()
+{
+    if(window.zcModalBound) return;
+    window.zcModalBound = true;
+
+    function esc(s)
+    {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function closeModal()
+    {
+        var m = document.getElementById('zcModalMask');
+        if(m) m.parentNode.removeChild(m);
+    }
+
+    function openModal(innerHTML)
+    {
+        closeModal();
+        var mask = document.createElement('div');
+        mask.id = 'zcModalMask';
+        mask.className = 'zc-modal-mask';
+        mask.innerHTML = '<div class="zc-modal">' + innerHTML + '</div>';
+        mask.addEventListener('click', function(e){ if(e.target === mask) closeModal(); });
+        document.body.appendChild(mask);
+        var btn = mask.querySelector('.zc-modal-close');
+        if(btn) btn.addEventListener('click', closeModal);
+    }
+
+    function headHTML(title, color, countText)
+    {
+        var badge = color ? '<span class="zc-modal-badge" style="background:' + esc(color) + '">' + esc(title) + '</span>' : '';
+        return '<div class="zc-modal-head">' + badge +
+               '<h3>' + esc(title) + ' 明细</h3>' +
+               '<span class="zc-modal-count">' + esc(countText || '') + '</span>' +
+               '<button type="button" class="zc-modal-close" title="关闭">&times;</button></div>';
+    }
+
+    function renderTable(data)
+    {
+        var cols  = data.columns || {};
+        var items = data.items || [];
+        var keys  = Object.keys(cols);
+
+        if(!keys.length || !items.length)
+        {
+            var msg = data.note || '没有可展示的明细。';
+            return '<div class="zc-modal-empty">' + esc(msg) + '</div>';
+        }
+
+        var th = keys.map(function(k){ return '<th>' + esc(cols[k]) + '</th>'; }).join('');
+        var rows = items.map(function(it){
+            var tds = keys.map(function(k){
+                var v = it[k];
+                if(k === 'id')
+                {
+                    var text = '#' + esc(it.id) + ' ' + esc(it.name);
+                    return it.url
+                        ? '<td><a class="zc-task-link" href="' + esc(it.url) + '" target="_blank">' + text + '</a></td>'
+                        : '<td>' + text + '</td>';
+                }
+                if(v == null || v === '') v = '-';
+                return '<td>' + esc(v) + '</td>';
+            }).join('');
+            return '<tr>' + tds + '</tr>';
+        }).join('');
+
+        return '<div class="zc-modal-body"><table><thead><tr>' + th + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+    }
+
+    function loadDetail(tag)
+    {
+        var pid   = tag.getAttribute('data-pid');
+        var rule  = tag.getAttribute('data-rule');
+        var label = tag.getAttribute('data-label') || '';
+        var color = tag.style.background || '';
+        var tpl   = window.zouchaDetailURL || '';
+        if(!pid || !rule || !tpl) return;
+
+        var url = tpl.replace('__PID__', encodeURIComponent(pid)).replace('__RULE__', encodeURIComponent(rule));
+
+        openModal(headHTML(label, color, '加载中…') + '<div class="zc-modal-loading">正在加载明细…</div>');
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest'); // 禅道20：生 XHR 需此头，否则 302 跳应用壳
+        xhr.onreadystatechange = function(){
+            if(xhr.readyState !== 4) return;
+            var data;
+            try { data = JSON.parse(xhr.responseText); }
+            catch(err) { openModal(headHTML(label, color, '') + '<div class="zc-modal-empty">明细加载失败，请重试。</div>'); return; }
+
+            var countText = (data.items && data.items.length) ? ('共 ' + data.items.length + ' 条') : '';
+            openModal(headHTML(label, color, countText) + renderTable(data));
+        };
+        xhr.send();
+    }
+
+    document.addEventListener('click', function(e){
+        var tag = e.target.closest && e.target.closest('.zc-tag-clickable[data-rule]');
+        if(tag) { e.preventDefault(); loadDetail(tag); }
+    });
+    document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeModal(); });
+})();

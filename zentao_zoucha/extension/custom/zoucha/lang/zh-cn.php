@@ -12,6 +12,7 @@ if(!isset($lang->resource)) $lang->resource = new stdclass();
 $lang->resource->zoucha = new stdclass();
 $lang->resource->zoucha->browse = 'browse';
 $lang->resource->zoucha->export = 'export';
+$lang->resource->zoucha->detail = 'detail';
 
 /* 规则键 => 中文标签 */
 $lang->zoucha->ruleList = array(

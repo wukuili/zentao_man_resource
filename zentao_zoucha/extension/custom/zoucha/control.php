@@ -162,6 +162,66 @@ class zoucha extends control
     }
 
     /**
+     * 列表页点击「走查结果」标签时，返回该项目命中该规则的明细列表（JSON）。
+     * 供前端弹框渲染。任务行带禅道任务详情链接。
+     *
+     * @param int    $projectID
+     * @param string $rule overdue|longTask|stale|noTask|noExecution
+     */
+    public function detail($projectID = 0, $rule = '')
+    {
+        /* 禅道 PATH_INFO 模式下命名参数不可靠，统一从 $_GET 兜底 */
+        $projectID = isset($_GET['projectID']) ? (int)$_GET['projectID'] : (int)$projectID;
+        $rule      = isset($_GET['rule'])      ? (string)$_GET['rule']   : (string)$rule;
+
+        $data  = $this->zoucha->getRuleItems($projectID, $rule);
+        $items = $data['items'];
+
+        /* 每条规则展示的列（key 对应 item 字段） */
+        $columnDefs = array(
+            'overdue'  => array('id' => '任务', 'statusName' => '状态', 'ownerName' => '指派给', 'deadline' => '截止日期'),
+            'longTask' => array('id' => '任务', 'statusName' => '状态', 'ownerName' => '指派给', 'estStarted' => '预计开始', 'deadline' => '截止日期', 'spanDays' => '工期(天)'),
+            'stale'    => array('id' => '任务', 'statusName' => '状态', 'ownerName' => '指派给', 'lastActivity' => '最近活动'),
+        );
+        $columns = isset($columnDefs[$rule]) ? $columnDefs[$rule] : array();
+
+        /* 给任务行补任务详情链接 */
+        foreach($items as $it)
+        {
+            $it->url = helper::createLink('task', 'view', "taskID={$it->id}");
+        }
+
+        $ruleList  = isset($this->lang->zoucha->ruleList) ? (array)$this->lang->zoucha->ruleList : array();
+        $ruleLabel = isset($ruleList[$rule]) ? $ruleList[$rule] : $rule;
+
+        /* 无明细列表的规则给出说明文案 */
+        $emptyNote = '';
+        if(empty($columns))
+        {
+            $noteMap = array(
+                'noTask'      => '该项目下没有任何任务（已排除已关闭执行下的任务）。',
+                'noExecution' => '该项目下没有任何未删除的执行（迭代 / 阶段）。',
+            );
+            $emptyNote = isset($noteMap[$rule]) ? $noteMap[$rule] : '该规则无可展开的明细。';
+        }
+
+        $response = array(
+            'result'    => 'success',
+            'project'   => $data['project'],
+            'rule'      => $rule,
+            'ruleLabel' => $ruleLabel,
+            'columns'   => $columns,
+            'items'     => $items,
+            'note'      => $emptyNote,
+        );
+
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-cache, no-store, must-revalidate');
+        echo json_encode($response, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    /**
      * 诊断单个项目的走查判定明细（仅管理员）。
      *
      * @param int $projectID

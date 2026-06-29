@@ -35,6 +35,8 @@ $exportURL = helper::createLink('zoucha', 'export', "rule={$rule}");
 /* 筛选跳转 URL 模板（用 __RULE__ 占位，JS 替换为实际规则键）。
  * 用 createLink 带参数生成，禅道 PATH_INFO 模式下路由正确解析位置参数，不依赖 $_GET。 */
 jsVar('window.zouchaFilterURL', helper::createLink('zoucha', 'browse', "rule=__RULE__&pageID=1"));
+/* 明细弹框 URL 模板（__PID__/__RULE__ 占位，JS 替换） */
+jsVar('window.zouchaDetailURL', helper::createLink('zoucha', 'detail', "projectID=__PID__&rule=__RULE__"));
 
 /* 工具栏 */
 toolbar
@@ -97,9 +99,14 @@ else
             $label = zget($ruleList, $h, $h);
             $name  = zget($ruleList, $h, $h);
             if($h === 'overdue' && $row->overdueCount > 0) $label .= ' ' . $row->overdueCount;
-            /* data-tip：规则名 + 详细说明，JS 悬停时弹出浮层（white-space:pre-line 保留换行） */
-            $tip = $name . "\n" . (isset($descMap[$h]) ? $descMap[$h] : '');
-            $tags .= '<span class="zc-tag" data-tip="' . htmlspecialchars($tip) . '" style="background:' . htmlspecialchars($color) . '">' . htmlspecialchars($label) . '</span>';
+            /* data-tip：规则名 + 详细说明，JS 悬停时弹出浮层（white-space:pre-line 保留换行）
+             * data-pid/data-rule：点击时拉取该项目该规则的明细弹框 */
+            $tip      = $name . "\n" . (isset($descMap[$h]) ? $descMap[$h] : '');
+            $clickable = in_array($h, array('overdue', 'longTask', 'stale'), true) ? ' zc-tag-clickable' : '';
+            $tags .= '<span class="zc-tag' . $clickable . '" data-tip="' . htmlspecialchars($tip)
+                . '" data-pid="' . (int)$row->projectID . '" data-rule="' . htmlspecialchars($h)
+                . '" data-label="' . htmlspecialchars($name) . '" style="background:' . htmlspecialchars($color) . '">'
+                . htmlspecialchars($label) . '</span>';
         }
 
         /* 命中规则越多越醒目 */

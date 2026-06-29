@@ -260,4 +260,163 @@ class zouchaModel extends model
             'evaluated'  => $evaluated,
         );
     }
+
+    /**
+     * 取某项目命中某条规则的「明细列表」，供列表页点击标签弹框展示。
+     * 口径与 zouchaRules::evaluate 完全一致（同样排除已关闭执行下的任务）。
+     *
+     * @param int    $projectID
+     * @param string $rule overdue|longTask|stale|noTask|noExecution
+     * @return array ['project'=>string|null, 'rule'=>string, 'items'=>object[]]
+     *               item 字段：id, name, statusName, ownerName, estStarted, deadline, lastActivity, spanDays
+     */
+    public function getRuleItems($projectID, $rule)
+    {
+        $projectID = (int)$projectID;
+        $rule      = (string)$rule;
+
+        $doneStatuses   = array('done', 'closed', 'cancel');           // R5 跨度排除
+        $overdueExclude = array('done', 'closed', 'cancel', 'pause');  // R3 逾期排除
+        $closedStatuses = array('closed', 'cancel');                   // R2 视为已关闭状态
+
+        $longTaskDays = isset($this->config->zoucha->longTaskDays) ? (int)$this->config->zoucha->longTaskDays : 14;
+        $today        = date('Y-m-d');
+        $todayTs      = strtotime($today);
+
+        /* 项目基本信息（仅在研、未删除项目） */
+        $project = $this->dao->select('id, name')
+            ->from(TABLE_PROJECT)
+            ->where('id')->eq($projectID)
+            ->andWhere('type')->eq('project')
+            ->andWhere('deleted')->eq('0')
+            ->fetch();
+        if(!$project) return array('project' => null, 'rule' => $rule, 'items' => array());
+
+        /* 已关闭执行（用于过滤其下任务） */
+        $executions = $this->dao->select('id, status')
+            ->from(TABLE_EXECUTION)
+            ->where('project')->eq($projectID)
+            ->andWhere('`type`')->in('sprint,stage,kanban')
+            ->andWhere('deleted')->eq('0')
+            ->fetchAll('id');
+        $closedExecutionIDs = array();
+        foreach($executions as $exec)
+        {
+            if($exec->status === 'closed') $closedExecutionIDs[$exec->id] = true;
+        }
+
+        /* 取任务（含名称、指派人），过滤已关闭执行下的任务 */
+        $rawTasks = $this->dao->select('id, name, execution, status, assignedTo, estStarted, deadline, openedDate, lastEditedDate')
+            ->from(TABLE_TASK)
+            ->where('project')->eq($projectID)
+            ->andWhere('deleted')->eq('0')
+            ->fetchAll();
+
+        $tasks = array();
+        foreach($rawTasks as $t)
+        {
+            $execID = (int)$t->execution;
+            if($execID !== 0 && isset($closedExecutionIDs[$execID])) continue;
+            $tasks[] = $t;
+        }
+
+        /* 任务状态中文名 */
+        $this->app->loadLang('task');
+        $statusList = (isset($this->lang->task->statusList) && is_array($this->lang->task->statusList))
+            ? $this->lang->task->statusList
+            : array('wait' => '未开始', 'doing' => '进行中', 'done' => '已完成', 'pause' => '已暂停', 'cancel' => '已取消', 'closed' => '已关闭');
+
+        /* 指派人真实姓名 */
+        $accounts = array();
+        foreach($tasks as $t) if(!empty($t->assignedTo)) $accounts[$t->assignedTo] = $t->assignedTo;
+        $ownerNames = array();
+        if(!empty($accounts))
+        {
+            $users = $this->dao->select('account, realname')->from(TABLE_USER)
+                ->where('account')->in(array_values($accounts))->fetchAll('account');
+            foreach($users as $u) $ownerNames[$u->account] = $u->realname;
+        }
+
+        /* 组装一行明细 */
+        $makeItem = function($t) use ($statusList, $ownerNames)
+        {
+            $est  = zouchaModel::pickDate($t->estStarted);
+            $dead = zouchaModel::pickDate($t->deadline);
+            $act  = self::maxDate(zouchaModel::pickDateTime($t->openedDate), zouchaModel::pickDateTime($t->lastEditedDate));
+            $span = ($est !== null && $dead !== null) ? (int)round((strtotime($dead) - strtotime($est)) / 86400) : null;
+            return (object) array(
+                'id'           => (int)$t->id,
+                'name'         => (string)$t->name,
+                'status'       => (string)$t->status,
+                'statusName'   => isset($statusList[$t->status]) ? $statusList[$t->status] : (string)$t->status,
+                'ownerName'    => (!empty($t->assignedTo) && isset($ownerNames[$t->assignedTo])) ? $ownerNames[$t->assignedTo] : (string)$t->assignedTo,
+                'estStarted'   => $est !== null ? $est : '',
+                'deadline'     => $dead !== null ? $dead : '',
+                'lastActivity' => $act !== null ? substr($act, 0, 10) : '',
+                'spanDays'     => $span,
+            );
+        };
+
+        $items = array();
+        switch($rule)
+        {
+            case 'overdue':  // 逾期任务：截止日早于今天，且状态非 完成/关闭/取消/暂停
+                foreach($tasks as $t)
+                {
+                    $dead = self::pickDate($t->deadline);
+                    if($dead !== null && strtotime($dead) < $todayTs && !in_array($t->status, $overdueExclude, true))
+                        $items[] = $makeItem($t);
+                }
+                break;
+
+            case 'longTask':  // 任务超期：计划工期 > longTaskDays，且任务非 完成/关闭/取消
+                foreach($tasks as $t)
+                {
+                    $dead = self::pickDate($t->deadline);
+                    $est  = self::pickDate($t->estStarted);
+                    if($dead !== null && $est !== null && !in_array($t->status, $doneStatuses, true)
+                        && ((strtotime($dead) - strtotime($est)) / 86400) > $longTaskDays)
+                        $items[] = $makeItem($t);
+                }
+                break;
+
+            case 'stale':  // 近一周未更新：列出全部未关闭任务及其最近活动，按活动时间升序（最久未动在前）
+                foreach($tasks as $t)
+                {
+                    if(in_array($t->status, $closedStatuses, true)) continue;
+                    $items[] = $makeItem($t);
+                }
+                usort($items, function($a, $b){ return strcmp((string)$a->lastActivity, (string)$b->lastActivity); });
+                break;
+
+            default:  // noTask / noExecution 等无明细列表，返回空集（前端展示规则说明）
+                break;
+        }
+
+        return array('project' => (string)$project->name, 'rule' => $rule, 'items' => $items);
+    }
+
+    /* date 列规整：空/全零返回 null，否则 'Y-m-d' */
+    public static function pickDate($v)
+    {
+        $v = (string)$v;
+        if($v === '' || strpos($v, '0000-00-00') === 0) return null;
+        return substr($v, 0, 10);
+    }
+
+    /* datetime 列规整：空/全零返回 null，否则原值 */
+    public static function pickDateTime($v)
+    {
+        $v = (string)$v;
+        if($v === '' || strpos($v, '0000-00-00') === 0) return null;
+        return $v;
+    }
+
+    /* 两个日期字符串取较晚者，null 视为最小 */
+    private static function maxDate($a, $b)
+    {
+        if($a === null) return $b;
+        if($b === null) return $a;
+        return ($a >= $b) ? $a : $b;
+    }
 }
