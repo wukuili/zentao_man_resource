@@ -1,0 +1,12 @@
+{
+    "code": "zhoubao",
+    "name": "项目周报",
+    "version": "1.0",
+    "zentaoVersion": ">=20.0",
+    "author": "李永杰",
+    "email": "wukuili@gmail.com",
+    "description": "项目维度周报插件：项目经理按自然周填写周报，自动罗列本周完成/未完成/逾期任务与进度工时，汇总看板做未填报提醒，支持一键复制上周、导出、走查联动，并通过企微群机器人定时推送填报情况。",
+    "type": "extension",
+    "depend": [],
+    "incompatible": []
+}

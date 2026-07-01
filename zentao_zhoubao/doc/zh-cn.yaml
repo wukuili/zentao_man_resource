@@ -1,0 +1,20 @@
+# 基本信息。
+name: 项目周报
+code: zhoubao
+type: extension
+copyright: 神思电子技术股份有限公司 2026
+site: https://www.sdses.com
+author: 李永杰
+abstract: 禅道项目周报（项目维度）插件
+# 描述和安装文档
+desc: |
+  项目维度周报插件，项目经理按自然周为负责项目填写周报，自动罗列本周完成/未完成/逾期任务与进度工时。汇总看板做未填报提醒，支持一键复制上周手写内容、导出、走查联动，并通过企微群机器人定时推送当周填报情况与摘要。
+install: |
+  后台本地安装
+# 版本信息。
+releases:
+  1.0:
+    zentaoversion: 20.0+,biz10.0+,max5.0+,ipd2.0+
+    charge: free
+    changelog: 初始版本，项目周报填报、汇总看板提醒、企微定时推送。
+    date: 2026-07-01

@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `zt_zhoubao` (
+  `id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
+  `project` mediumint(8) unsigned NOT NULL DEFAULT '0',
+  `year` smallint(6) NOT NULL DEFAULT '0',
+  `week` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `weekStart` date DEFAULT NULL,
+  `account` varchar(30) NOT NULL DEFAULT '',
+  `nextPlan` text,
+  `risk` text,
+  `summary` text,
+  `snapshot` mediumtext,
+  `status` enum('draft','submitted') NOT NULL DEFAULT 'draft',
+  `submittedDate` datetime DEFAULT NULL,
+  `createdDate` datetime DEFAULT NULL,
+  `editedDate` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_project_week` (`project`,`year`,`week`),
+  KEY `idx_week` (`year`,`week`),
+  KEY `idx_account` (`account`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
