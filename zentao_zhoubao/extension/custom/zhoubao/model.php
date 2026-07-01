@@ -153,7 +153,32 @@ class zhoubaoModel extends model
             'doneCount'    => count($cls['done']),
             'overdueCount' => count($cls['overdue']),
         );
+        $cls['zoucha'] = $this->getZouchaHits($project);
         return $cls;
+    }
+
+    /* 取该项目当前命中的走查失管规则名；zoucha 未安装/未命中则返回空数组 */
+    public function getZouchaHits($project)
+    {
+        $libFile = $this->app->getAppRoot() . 'extension/custom/zoucha/lib/zouchaRules.php';
+        if(!file_exists($libFile)) return array();
+
+        try
+        {
+            $zouchaModel = $this->loadModel('zoucha');
+            if(!method_exists($zouchaModel, 'inspect')) return array();
+
+            $results = $zouchaModel->inspect();
+            foreach($results as $r)
+            {
+                if(isset($r->projectID) && (int)$r->projectID === (int)$project) return (array)$r->hits;
+            }
+            return array();
+        }
+        catch(\Throwable $e)
+        {
+            return array();
+        }
     }
 
     public function getReport($project, $weekStart)

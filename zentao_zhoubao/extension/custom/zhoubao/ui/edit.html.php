@@ -44,6 +44,16 @@ $pageHTML .= '<span>完成 ' . (int)$stat['doneCount'] . '</span>';
 $pageHTML .= '<span>逾期 ' . (int)$stat['overdueCount'] . '</span>';
 $pageHTML .= '</div>';
 
+if(!empty($auto['zoucha']))
+{
+    $pageHTML .= '<div class="zb-zoucha-tags">走查提示：';
+    foreach($auto['zoucha'] as $rule)
+    {
+        $pageHTML .= '<span class="label label-warning">' . $esc($rule) . '</span> ';
+    }
+    $pageHTML .= '</div>';
+}
+
 $pageHTML .= '<h3>' . $esc($lang->zhoubao->doneTasks) . '</h3>';
 $pageHTML .= '<table class="zb-table"><thead><tr><th>任务</th><th>负责人</th><th>完成时间</th><th>工时</th></tr></thead><tbody>' . ($doneRowsHTML ?: '<tr><td colspan="4">本周暂无完成任务</td></tr>') . '</tbody></table>';
 
