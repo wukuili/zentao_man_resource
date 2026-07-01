@@ -64,6 +64,7 @@ $filterHTML .= '</select>';
 
 $filterHTML .= '<button type="button" class="btn btn-primary btn-sm" onclick="zbSubmitFilter()" style="margin-left:8px">筛选</button>';
 $filterHTML .= '<button type="button" class="btn btn-default btn-sm" onclick="zbResetFilter()">重置</button>';
+$filterHTML .= '<a class="btn btn-default btn-sm" href="' . helper::createLink('zhoubao', 'export', "type=board&week={$curWeek}") . '" style="margin-left:8px">' . htmlspecialchars($lang->zhoubao->export) . '</a>';
 $filterHTML .= '</div>';
 
 /* ── 数据表 ── */

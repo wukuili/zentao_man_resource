@@ -93,4 +93,37 @@ class zhoubao extends control
         $this->view->auto        = $report->snapshot ? json_decode($report->snapshot, true) : array('done'=>array(),'undone'=>array(),'overdue'=>array(),'stat'=>array());
         $this->display();
     }
+
+    /**
+     * 导出 CSV。
+     * @param string $type board=当周看板汇总 / one=单份周报
+     * @param string $week 周起始日（board 用）
+     * @param int    $id   周报 ID（one 用）
+     */
+    public function export($type = 'board', $week = '', $id = 0)
+    {
+        $filename = 'zhoubao_' . date('Ymd') . '.csv';
+        header('Content-Type: text/csv; charset=utf-8');
+        header("Content-Disposition: attachment; filename=$filename");
+        echo "\xEF\xBB\xBF"; // UTF-8 BOM，Excel 正确识别中文
+
+        $out = fopen('php://output', 'w');
+        if($type === 'one' && $id)
+        {
+            $r = $this->dao->select('*')->from('zt_zhoubao')->where('id')->eq((int)$id)->fetch();
+            $p = $r ? $this->dao->select('name')->from(TABLE_PROJECT)->where('id')->eq($r->project)->fetch('name') : '';
+            fputcsv($out, array('项目', '周次', '下周计划', '风险', '本周小结'));
+            if($r) fputcsv($out, array($p, '第' . $r->week . '周', $r->nextPlan, $r->risk, $r->summary));
+        }
+        else
+        {
+            $weekStart = $this->zhoubao->resolveWeekStart($week);
+            $rows = $this->zhoubao->getBoardRows($weekStart, '', '');
+            $labels = $this->lang->zhoubao->statusList;
+            fputcsv($out, array('项目', '项目经理', '填报状态', '本周完成', '逾期任务'));
+            foreach($rows as $r) fputcsv($out, array($r->projectName, $r->pm, zget($labels, $r->status, $r->status), $r->doneCount, $r->overdueCount));
+        }
+        fclose($out);
+        exit;
+    }
 }
