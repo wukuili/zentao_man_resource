@@ -114,4 +114,91 @@ class zhoubaoModel extends model
         }
         return $rows;
     }
+
+    /* 本周消耗工时：zt_effort.date 落在本周的 consumed 之和 */
+    public function getWeekEffort($project, $start, $end)
+    {
+        return (float)$this->dao->select('SUM(consumed) AS v')->from(TABLE_EFFORT)
+            ->where('project')->eq($project)
+            ->andWhere('date')->ge($start)
+            ->andWhere('date')->le($end)
+            ->andWhere('deleted')->eq('0')
+            ->fetch('v');
+    }
+
+    /* 组装自动区数据（实时） */
+    public function buildAutoData($project, $weekStart)
+    {
+        if(!class_exists('zhoubaoRules'))
+        {
+            include_once __DIR__ . '/lib/zhoubaoRules.php';
+        }
+
+        $range = $this->getWeekRange($weekStart);
+        $today = date('Y-m-d');
+        $tasksByProject = $this->getProjectTasks(array($project));
+        $tasks = isset($tasksByProject[$project]) ? $tasksByProject[$project] : array();
+        $cls   = zhoubaoRules::classifyTasks($tasks, $range['start'], $range['end'], $today);
+
+        $totalLeft = 0;
+        foreach($cls['undone'] as $t)  $totalLeft += (float)(isset($t['left']) ? $t['left'] : 0);
+        foreach($cls['overdue'] as $t) $totalLeft += (float)(isset($t['left']) ? $t['left'] : 0);
+
+        $progress = (int)$this->dao->select('progress')->from(TABLE_PROJECT)->where('id')->eq($project)->fetch('progress');
+
+        $cls['stat'] = array(
+            'progress'     => $progress,
+            'weekConsumed' => $this->getWeekEffort($project, $range['start'], $range['end']),
+            'totalLeft'    => $totalLeft,
+            'doneCount'    => count($cls['done']),
+            'overdueCount' => count($cls['overdue']),
+        );
+        return $cls;
+    }
+
+    public function getReport($project, $weekStart)
+    {
+        $range = $this->getWeekRange($weekStart);
+        return $this->dao->select('*')->from('zt_zhoubao')
+            ->where('project')->eq($project)
+            ->andWhere('year')->eq($range['year'])
+            ->andWhere('week')->eq($range['week'])
+            ->fetch();
+    }
+
+    /* 保存草稿或提交；提交时固化 snapshot */
+    public function saveReport($project, $weekStart, $post, $account, $submit)
+    {
+        $range = $this->getWeekRange($weekStart);
+        $now   = helper::now();
+        $exist = $this->getReport($project, $weekStart);
+
+        $data = new stdclass();
+        $data->nextPlan  = isset($post['nextPlan']) ? $post['nextPlan'] : '';
+        $data->risk      = isset($post['risk'])     ? $post['risk']     : '';
+        $data->summary   = isset($post['summary'])  ? $post['summary']  : '';
+        $data->editedDate= $now;
+        if($submit)
+        {
+            $data->status        = 'submitted';
+            $data->submittedDate = $now;
+            $data->snapshot      = json_encode($this->buildAutoData($project, $weekStart));
+        }
+
+        if($exist)
+        {
+            $this->dao->update('zt_zhoubao')->data($data)->where('id')->eq($exist->id)->exec();
+            return dao::isError() ? false : $exist->id;
+        }
+
+        $data->project   = $project;
+        $data->year      = $range['year'];
+        $data->week      = $range['week'];
+        $data->weekStart = $range['start'];
+        $data->account   = $account;
+        $data->status    = $submit ? 'submitted' : 'draft';
+        $data->createdDate = $now;
+        $this->dao->insert('zt_zhoubao')->data($data)->exec();
+        return dao::isError() ? false : $this->dao->lastInsertID();
+    }
 }

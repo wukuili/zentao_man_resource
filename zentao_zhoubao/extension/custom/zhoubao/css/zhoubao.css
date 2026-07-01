@@ -1,0 +1,8 @@
+.zb-stat-cards{display:flex;gap:12px;margin:8px 0}
+.zb-stat-cards span{padding:6px 12px;background:#f2f5fa;border-radius:6px;font-weight:600}
+.zb-table{width:100%;border-collapse:collapse;margin-bottom:16px}
+.zb-table th,.zb-table td{border:1px solid #e3e8ee;padding:6px 10px;text-align:left}
+.zb-table tr.zb-overdue td{color:#d9534f}
+.zb-form-group{margin-bottom:12px}
+.zb-form-group label{display:block;font-weight:600;margin-bottom:4px}
+.zb-form-actions{margin-top:12px}

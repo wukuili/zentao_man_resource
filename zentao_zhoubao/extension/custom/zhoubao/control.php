@@ -23,4 +23,41 @@ class zhoubao extends control
         $this->view->fill      = $fill;
         $this->display();
     }
+
+    /**
+     * 填写/编辑周报。
+     * @param int    $project 项目 ID
+     * @param string $week    周起始日（2026_06_29，'' 表示本周）
+     */
+    public function edit($project, $week = '')
+    {
+        $project   = (int)$project;
+        $weekStart = $this->zhoubao->resolveWeekStart(isset($_GET['week']) ? $_GET['week'] : $week);
+
+        $projectInfo = $this->dao->select('id, name, PM')->from(TABLE_PROJECT)->where('id')->eq($project)->fetch();
+        if(!$projectInfo) return $this->send(array('result' => 'fail', 'message' => '项目不存在'));
+
+        /* 权限：非 manage 权限者只能写自己负责的项目 */
+        $canManage = common::hasPriv('zhoubao', 'manage');
+        if(!$canManage && $projectInfo->PM !== $this->app->user->account)
+        {
+            return $this->send(array('result' => 'fail', 'message' => '仅项目经理可填写本项目周报'));
+        }
+
+        if($this->server->request_method == 'POST')
+        {
+            $submit = !empty($_POST['submit']);
+            $id = $this->zhoubao->saveReport($project, $weekStart, $_POST, $this->app->user->account, $submit);
+            if($id === false) return $this->send(array('result' => 'fail', 'message' => dao::getError()));
+            $locate = $submit ? inlink('view', "id=$id") : inlink('edit', "project=$project&week=" . str_replace('-', '_', $weekStart));
+            return $this->send(array('result' => 'success', 'locate' => $locate));
+        }
+
+        $this->view->title       = $this->lang->zhoubao->editTitle;
+        $this->view->projectInfo = $projectInfo;
+        $this->view->weekStart   = $weekStart;
+        $this->view->auto        = $this->zhoubao->buildAutoData($project, $weekStart);
+        $this->view->report      = $this->zhoubao->getReport($project, $weekStart);
+        $this->display();
+    }
 }
