@@ -11,6 +11,9 @@ desc: |
   项目维度周报插件，项目经理按自然周为负责项目填写周报，自动罗列本周完成/未完成/逾期任务与进度工时。汇总看板做未填报提醒，支持一键复制上周手写内容、导出、走查联动，并通过企微群机器人定时推送当周填报情况与摘要。
 install: |
   后台本地安装
+  企微定时推送：在 config/ext/zhoubao.php 中配置 $config->zhoubao->wecomWebhook 与 pushToken 为真实值后，
+  在目标服务器系统 crontab 中添加，例如每周五 17:00 触发：
+  0 17 * * 5 curl 'http(s)://<禅道地址>/zhoubao-cronPush-token-<token>.html'
 # 版本信息。
 releases:
   1.0:

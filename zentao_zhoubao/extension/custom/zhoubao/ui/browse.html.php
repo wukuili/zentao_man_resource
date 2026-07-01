@@ -65,6 +65,10 @@ $filterHTML .= '</select>';
 $filterHTML .= '<button type="button" class="btn btn-primary btn-sm" onclick="zbSubmitFilter()" style="margin-left:8px">筛选</button>';
 $filterHTML .= '<button type="button" class="btn btn-default btn-sm" onclick="zbResetFilter()">重置</button>';
 $filterHTML .= '<a class="btn btn-default btn-sm" href="' . helper::createLink('zhoubao', 'export', "type=board&week={$curWeek}") . '" style="margin-left:8px">' . htmlspecialchars($lang->zhoubao->export) . '</a>';
+if(common::hasPriv('zhoubao', 'manage'))
+{
+    $filterHTML .= '<a class="btn btn-primary btn-sm" href="javascript:;" id="btnPushNow" data-url="' . helper::createLink('zhoubao', 'pushNow', "week={$curWeek}") . '" style="margin-left:8px">' . htmlspecialchars($lang->zhoubao->pushNow) . '</a>';
+}
 $filterHTML .= '</div>';
 
 /* ── 数据表 ── */
@@ -142,6 +146,16 @@ echo <<<JS
         var url = window.zhoubaoFilterURL.replace('__PM__', 'all').replace('__FILL__', 'all');
         window.location.href = url;
     };
+
+    var pn = document.getElementById('btnPushNow');
+    if(pn) pn.addEventListener('click', function()
+    {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', pn.getAttribute('data-url'), true);
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        xhr.onload = function(){ try{ var r = JSON.parse(xhr.responseText); alert(r.message || '完成'); }catch(e){ alert('推送返回解析失败'); } };
+        xhr.send('');
+    });
 })();
 </script>
 JS;

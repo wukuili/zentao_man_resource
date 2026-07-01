@@ -126,4 +126,29 @@ class zhoubao extends control
         fclose($out);
         exit;
     }
+
+    /**
+     * 企微定时推送入口，供 cron/系统 crontab curl 调用。token 校验。
+     * @param string $token 与 config->zhoubao->pushToken 比对
+     * @param string $week  周起始日（'' 表示本周）
+     */
+    public function cronPush($token = '', $week = '')
+    {
+        $token = isset($_GET['token']) ? (string)$_GET['token'] : (string)$token;
+        if($token === '' || $token !== $this->config->zhoubao->pushToken) return print('invalid token');
+        $weekStart = $this->zhoubao->resolveWeekStart(isset($_GET['week']) ? $_GET['week'] : $week);
+        $res = $this->zhoubao->pushWecom($weekStart);
+        return print($res['message']);
+    }
+
+    /**
+     * 看板"立即推送"按钮触发。需 manage 权限。
+     * @param string $week
+     */
+    public function pushNow($week = '')
+    {
+        if(!common::hasPriv('zhoubao', 'manage')) return $this->send(array('result' => 'fail', 'message' => '无推送权限'));
+        $weekStart = $this->zhoubao->resolveWeekStart(isset($_GET['week']) ? $_GET['week'] : $week);
+        return $this->send($this->zhoubao->pushWecom($weekStart));
+    }
 }

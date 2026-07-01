@@ -233,4 +233,36 @@ class zhoubaoModel extends model
         $this->dao->insert('zt_zhoubao')->data($data)->exec();
         return dao::isError() ? false : $this->dao->lastInsertID();
     }
+
+    /* 组装当周填报 markdown 并 POST 到企微群机器人 */
+    public function pushWecom($weekStart)
+    {
+        if(!class_exists('zhoubaoRules'))
+        {
+            include_once __DIR__ . '/lib/zhoubaoRules.php';
+        }
+
+        $webhook = isset($this->config->zhoubao->wecomWebhook) ? $this->config->zhoubao->wecomWebhook : '';
+        if(empty($webhook)) return array('result' => 'fail', 'message' => '未配置企微 webhook');
+
+        $range = $this->getWeekRange($weekStart);
+        $rows  = $this->getBoardRows($weekStart, '', '');
+        $mdRows = array();
+        foreach($rows as $r) $mdRows[] = array('project'=>$r->projectName,'pm'=>$r->pm,'status'=>$r->status,'doneCount'=>$r->doneCount,'overdueCount'=>$r->overdueCount);
+        $content = zhoubaoRules::buildWecomMarkdown($mdRows, $range['year'], $range['week']);
+
+        $payload = json_encode(array('msgtype' => 'markdown', 'markdown' => array('content' => $content)));
+
+        $ch = curl_init($webhook);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        $resp = curl_exec($ch);
+        $err  = curl_error($ch);
+        curl_close($ch);
+        if($err) return array('result' => 'fail', 'message' => '推送失败：' . $err);
+        return array('result' => 'success', 'message' => '推送成功', 'resp' => $resp);
+    }
 }
