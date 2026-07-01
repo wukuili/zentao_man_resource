@@ -166,6 +166,13 @@ class zhoubaoModel extends model
             ->fetch();
     }
 
+    /* 取上一自然周同项目周报 */
+    public function getPrevReport($project, $weekStart)
+    {
+        $prevStart = date('Y-m-d', strtotime($weekStart . ' -7 days'));
+        return $this->getReport($project, $prevStart);
+    }
+
     /* 保存草稿或提交；提交时固化 snapshot */
     public function saveReport($project, $weekStart, $post, $account, $submit)
     {

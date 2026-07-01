@@ -60,4 +60,37 @@ class zhoubao extends control
         $this->view->report      = $this->zhoubao->getReport($project, $weekStart);
         $this->display();
     }
+
+    /**
+     * 复制上周手写内容。POST，返回 JSON。
+     * @param int    $project
+     * @param string $week
+     */
+    public function copyLast($project, $week = '')
+    {
+        $project   = (int)$project;
+        $weekStart = $this->zhoubao->resolveWeekStart(isset($_GET['week']) ? $_GET['week'] : $week);
+        $prev = $this->zhoubao->getPrevReport($project, $weekStart);
+        if(!$prev) return $this->send(array('result' => 'fail', 'message' => '上周暂无周报'));
+        return $this->send(array('result' => 'success', 'data' => array(
+            'nextPlan' => $prev->nextPlan, 'risk' => $prev->risk, 'summary' => $prev->summary,
+        )));
+    }
+
+    /**
+     * 查看已提交周报（只读，读 snapshot 不重算）。
+     * @param int $id
+     */
+    public function view($id)
+    {
+        $report = $this->dao->select('*')->from('zt_zhoubao')->where('id')->eq((int)$id)->fetch();
+        if(!$report) return print('周报不存在');
+        $projectInfo = $this->dao->select('id, name, PM')->from(TABLE_PROJECT)->where('id')->eq($report->project)->fetch();
+
+        $this->view->title       = $this->lang->zhoubao->viewTitle;
+        $this->view->report      = $report;
+        $this->view->projectInfo = $projectInfo;
+        $this->view->auto        = $report->snapshot ? json_decode($report->snapshot, true) : array('done'=>array(),'undone'=>array(),'overdue'=>array(),'stat'=>array());
+        $this->display();
+    }
 }
