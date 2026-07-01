@@ -29,5 +29,17 @@ check(!in_array(6, array_merge($ids($r['undone']),$ids($r['overdue']))),'脏/空
 $over3 = null; foreach($r['overdue'] as $t){ if($t['id']==3) $over3=$t; }
 check($over3 && $over3['daysOverdue'] === 6, '任务3 逾期天数=6');
 
+$rows = array(
+    array('project'=>'AA','pm'=>'张三','status'=>'submitted','doneCount'=>8,'overdueCount'=>1),
+    array('project'=>'BB','pm'=>'李四','status'=>'none',     'doneCount'=>0,'overdueCount'=>0),
+    array('project'=>'CC','pm'=>'王五','status'=>'draft',    'doneCount'=>2,'overdueCount'=>0),
+);
+$md = zhoubaoRules::buildWecomMarkdown($rows, 2026, 27);
+check(strpos($md, '第27周') !== false,       '含周次标题');
+check(strpos($md, '已交 1') !== false,         '已交计数=1（仅 submitted）');
+check(strpos($md, '缺交 2') !== false,         '缺交计数=2（none+draft）');
+check(strpos($md, 'BB') !== false && strpos($md, '李四') !== false, '缺交名单含 BB/李四');
+check(strpos($md, 'AA') !== false,             '已交摘要含 AA');
+
 echo $fail === 0 ? "\nALL PASSED\n" : "\n$fail FAILED\n";
 exit($fail === 0 ? 0 : 1);

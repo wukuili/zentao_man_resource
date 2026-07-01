@@ -52,4 +52,35 @@ class zhoubaoRules
 
         return array('done' => $done, 'undone' => $undone, 'overdue' => $overdue);
     }
+
+    /* 组装企微群机器人 markdown 文本。已交=submitted；缺交=none+draft */
+    public static function buildWecomMarkdown(array $rows, $year, $week)
+    {
+        $submitted = array(); $missing = array();
+        foreach($rows as $r)
+        {
+            if(isset($r['status']) && $r['status'] === 'submitted') $submitted[] = $r;
+            else $missing[] = $r;
+        }
+
+        $lines = array();
+        $lines[] = "**【项目周报提醒 · 第{$week}周】**";
+        $lines[] = "✅ 已交 " . count($submitted) . " / ❌ 缺交 " . count($missing);
+
+        if(!empty($missing))
+        {
+            $names = array();
+            foreach($missing as $r) $names[] = "{$r['project']}（{$r['pm']}）";
+            $lines[] = "> 缺交：" . implode('、', $names);
+        }
+        if(!empty($submitted))
+        {
+            $lines[] = "> 已交摘要：";
+            foreach($submitted as $r)
+            {
+                $lines[] = "> - {$r['project']} 完成{$r['doneCount']}任务 / 逾期{$r['overdueCount']}";
+            }
+        }
+        return implode("\n", $lines);
+    }
 }
