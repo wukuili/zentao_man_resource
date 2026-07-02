@@ -37,11 +37,13 @@ $undoneRows = $rowHTML(isset($auto['overdue']) ? $auto['overdue'] : array(), tru
 $canEdit = !empty($this->view->canEdit);
 $editURL = helper::createLink('zhoubao', 'edit', "project={$project->id}&week=" . str_replace('-', '_', (string)$report->weekStart));
 
-$pageHTML = '';
+$historyURL = helper::createLink('zhoubao', 'history', "project={$project->id}");
+$pageHTML  = '<div class="zb-view-actions"><a class="btn btn-default btn-sm" href="' . $historyURL . '" target="_blank">' . $esc($lang->zhoubao->viewHistory) . '</a>';
 if($canEdit)
 {
-    $pageHTML .= '<div class="zb-view-actions"><a class="btn btn-primary btn-sm" href="' . $editURL . '">' . $esc($lang->zhoubao->editReport) . '</a></div>';
+    $pageHTML .= ' <a class="btn btn-primary btn-sm" href="' . $editURL . '">' . $esc($lang->zhoubao->editReport) . '</a>';
 }
+$pageHTML .= '</div>';
 $gantt = $this->view->gantt;
 
 $pageHTML .= '<div class="zb-stat-cards">';

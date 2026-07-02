@@ -147,6 +147,27 @@ class zhoubao extends control
     }
 
     /**
+     * 单项目历史周报对比列表。
+     * @param int    $project
+     * @param string $weeks 4/8/12/all，非法值兜底 8
+     */
+    public function history($project, $weeks = '8')
+    {
+        $project = (int)$project;
+        $weeks   = isset($_GET['weeks']) ? (string)$_GET['weeks'] : (string)$weeks;
+        if(!in_array($weeks, array('4', '8', '12', 'all'), true)) $weeks = '8';
+
+        $projectInfo = $this->dao->select('id, name, PM')->from(TABLE_PROJECT)->where('id')->eq($project)->fetch();
+        if(!$projectInfo) return print('项目不存在');
+
+        $this->view->title       = $this->lang->zhoubao->historyTitle;
+        $this->view->projectInfo = $projectInfo;
+        $this->view->weeks       = $weeks;
+        $this->view->rows        = $this->zhoubao->getReportHistory($project, $weeks);
+        $this->display();
+    }
+
+    /**
      * 企微定时推送入口，供 cron/系统 crontab curl 调用。token 校验。
      * @param string $token 与 config->zhoubao->pushToken 比对
      * @param string $week  周起始日（'' 表示本周）

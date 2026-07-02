@@ -38,7 +38,9 @@ $copyURL = helper::createLink('zhoubao', 'copyLast', "project={$project->id}&wee
 
 $gantt = $this->view->gantt;
 
-$pageHTML  = '<h3>' . $esc($lang->zhoubao->statOverview) . '</h3>';
+$historyURL = helper::createLink('zhoubao', 'history', "project={$project->id}");
+$pageHTML  = '<div class="zb-view-actions"><a class="btn btn-default btn-sm" href="' . $historyURL . '" target="_blank">' . $esc($lang->zhoubao->viewHistory) . '</a></div>';
+$pageHTML .= '<h3>' . $esc($lang->zhoubao->statOverview) . '</h3>';
 $pageHTML .= '<div class="zb-stat-cards">';
 $pageHTML .= '<span>进度 ' . (int)$stat['progress'] . '%</span>';
 $pageHTML .= '<span>本周工时 ' . $esc($stat['weekConsumed']) . '</span>';

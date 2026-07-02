@@ -371,4 +371,14 @@ class zhoubaoModel extends model
         if($err) return array('result' => 'fail', 'message' => '推送失败：' . $err);
         return array('result' => 'success', 'message' => '推送成功', 'resp' => $resp);
     }
+
+    /* 单项目历史周报，按周倒序；weeks='all' 不限制条数，否则 limit 最近 N 条（含草稿，用于看计划连续性） */
+    public function getReportHistory($project, $weeks)
+    {
+        $query = $this->dao->select('*')->from('zt_zhoubao')
+            ->where('project')->eq($project)
+            ->orderBy('weekStart_desc');
+        if($weeks !== 'all') $query->limit((int)$weeks);
+        return $query->fetchAll();
+    }
 }

@@ -59,6 +59,10 @@ $lang->zhoubao->viewReport  = '查看';
 $lang->zhoubao->editReport  = '编辑';
 $lang->zhoubao->pushNow     = '立即推送企微';
 $lang->zhoubao->export      = '导出';
+$lang->zhoubao->historyTitle    = '历史周报对比';
+$lang->zhoubao->viewHistory     = '查看历史周报';
+$lang->zhoubao->weeksFilterLabel= '时间范围';
+$lang->zhoubao->weeksFilter     = array('4' => '最近4周', '8' => '最近8周', '12' => '最近12周', 'all' => '全部');
 
 $lang->zhoubao->prevWeek    = '上一周';
 $lang->zhoubao->thisWeek    = '本周';
