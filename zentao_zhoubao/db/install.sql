@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS `zt_zhoubao` (
   `account` varchar(30) NOT NULL DEFAULT '',
   `nextPlan` text,
   `risk` text,
+  `hasRisk` enum('yes','no') NOT NULL DEFAULT 'no' COMMENT '是否有风险/需协调资源',
   `summary` text,
   `snapshot` mediumtext,
   `status` enum('draft','submitted') NOT NULL DEFAULT 'draft',

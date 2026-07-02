@@ -16,6 +16,11 @@ install: |
   0 17 * * 5 curl 'http(s)://<禅道地址>/zhoubao-cronPush-token-<token>.html'
 # 版本信息。
 releases:
+  1.1:
+    zentaoversion: 20.0+,biz10.0+,max5.0+,ipd2.0+
+    charge: free
+    changelog: 风险改为单选(是/否)+看板风险筛选；单项目周报页新增迭代/阶段甘特图；新增历史周报对比列表；编辑页展示上周计划。
+    date: 2026-07-02
   1.0:
     zentaoversion: 20.0+,biz10.0+,max5.0+,ipd2.0+
     charge: free
