@@ -94,6 +94,14 @@ class zhoubao extends control
         $this->display();
     }
 
+    /* CSV 公式注入防护：单元格以 = + - @ 开头时加前导单引号，阻止 Excel/Sheets 当公式执行 */
+    private function csvSafe($value)
+    {
+        $value = (string)$value;
+        if($value !== '' && strpos('=+-@', $value[0]) !== false) return "'" . $value;
+        return $value;
+    }
+
     /**
      * 导出 CSV。
      * @param string $type board=当周看板汇总 / one=单份周报
@@ -113,7 +121,7 @@ class zhoubao extends control
             $r = $this->dao->select('*')->from('zt_zhoubao')->where('id')->eq((int)$id)->fetch();
             $p = $r ? $this->dao->select('name')->from(TABLE_PROJECT)->where('id')->eq($r->project)->fetch('name') : '';
             fputcsv($out, array('项目', '周次', '下周计划', '风险', '本周小结'));
-            if($r) fputcsv($out, array($p, '第' . $r->week . '周', $r->nextPlan, $r->risk, $r->summary));
+            if($r) fputcsv($out, array($p, '第' . $r->week . '周', $this->csvSafe($r->nextPlan), $this->csvSafe($r->risk), $this->csvSafe($r->summary)));
         }
         else
         {
