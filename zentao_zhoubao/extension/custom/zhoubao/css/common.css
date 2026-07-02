@@ -11,6 +11,7 @@
 .zb-prev-plan h3{margin:0 0 6px 0 !important}
 .zb-stat-cards{display:flex;gap:12px;margin:8px 0}
 .zb-stat-cards span{padding:6px 12px;background:#f2f5fa;border-radius:6px;font-weight:600}
+.zb-gantt-empty{padding:40px;text-align:center;color:#94a3b8}
 .zb-table{width:100%;border-collapse:collapse;margin-bottom:16px}
 .zb-table th,.zb-table td{border:1px solid #e3e8ee;padding:6px 10px;text-align:left}
 .zb-table tr.zb-overdue td{color:#d9534f}

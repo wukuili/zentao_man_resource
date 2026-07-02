@@ -254,6 +254,51 @@ class zhoubaoModel extends model
         return $this->getReport($project, $prevStart);
     }
 
+    /* 单项目迭代/阶段甘特图数据，用于周报页"项目态势"面板。
+       TABLE_EXECUTION 就是 zt_project（迭代/阶段是 type=sprint/stage/kanban 的行，project 字段指向所属项目）。 */
+    public function getProjectGantt($project)
+    {
+        $projectRow  = $this->dao->select('model, status, begin, end')->from(TABLE_PROJECT)->where('id')->eq($project)->fetch();
+        $modelLabels = array('waterfall' => '阶段甘特图', 'scrum' => '迭代甘特图', 'kanban' => '看板阶段');
+        $modelKey    = $projectRow ? (string)$projectRow->model : '';
+        $ganttTitle  = isset($modelLabels[$modelKey]) ? $modelLabels[$modelKey] : '项目进度甘特图';
+
+        $executions = $this->dao->select('id, name, type, status, begin, end, realBegan, realEnd')
+            ->from(TABLE_EXECUTION)
+            ->where('project')->eq($project)
+            ->andWhere('type')->in('sprint,stage,kanban')
+            ->andWhere('deleted')->eq('0')
+            ->orderBy('begin_asc')
+            ->fetchAll();
+
+        $today = date('Y-m-d');
+        $items = array();
+        foreach($executions as $exec)
+        {
+            $start = (!empty($exec->realBegan) && $exec->realBegan !== '0000-00-00') ? $exec->realBegan : $exec->begin;
+            $end   = (!empty($exec->realEnd)   && $exec->realEnd   !== '0000-00-00') ? $exec->realEnd   : $exec->end;
+            if(empty($start) || $start === '0000-00-00') continue;
+            if(empty($end) || $end === '0000-00-00') $end = date('Y-m-d', strtotime($start . ' +7 days'));
+
+            $color = '#94a3b8';
+            if($exec->status === 'doing')  $color = '#3b82f6';
+            if($exec->status === 'closed') $color = '#10b981';
+            if($end < $today && $exec->status !== 'closed') $color = '#ef4444';
+
+            $items[] = array(
+                'id'     => (int)$exec->id,
+                'name'   => $exec->name,
+                'type'   => $exec->type,
+                'status' => $exec->status,
+                'start'  => $start,
+                'end'    => $end,
+                'color'  => $color,
+            );
+        }
+
+        return array('title' => $ganttTitle, 'items' => $items);
+    }
+
     /* 保存草稿或提交；提交时固化 snapshot */
     public function saveReport($project, $weekStart, $post, $account, $submit)
     {

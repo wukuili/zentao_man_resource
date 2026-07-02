@@ -18,6 +18,7 @@ $lang->zhoubao->statusList  = array('none' => '缺交', 'draft' => '草稿', 'su
 $lang->zhoubao->doneTasks   = '本周完成任务';
 $lang->zhoubao->undoneTasks = '本周未完成/逾期任务';
 $lang->zhoubao->statOverview= '进度/工时概览';
+$lang->zhoubao->ganttEmpty = '该项目暂无迭代/阶段数据';
 $lang->zhoubao->nextPlan    = '下周计划';
 $lang->zhoubao->risk        = '风险与需协调资源';
 $lang->zhoubao->hasRiskQuestion = '是否有风险及需协调资源';

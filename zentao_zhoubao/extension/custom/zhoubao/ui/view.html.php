@@ -42,12 +42,17 @@ if($canEdit)
 {
     $pageHTML .= '<div class="zb-view-actions"><a class="btn btn-primary btn-sm" href="' . $editURL . '">' . $esc($lang->zhoubao->editReport) . '</a></div>';
 }
+$gantt = $this->view->gantt;
+
 $pageHTML .= '<div class="zb-stat-cards">';
 $pageHTML .= '<span>进度 ' . (int)(isset($stat['progress']) ? $stat['progress'] : 0) . '%</span>';
 $pageHTML .= '<span>本周工时 ' . $esc(isset($stat['weekConsumed']) ? $stat['weekConsumed'] : 0) . '</span>';
 $pageHTML .= '<span>完成 ' . (int)(isset($stat['doneCount']) ? $stat['doneCount'] : 0) . '</span>';
 $pageHTML .= '<span>逾期 ' . (int)(isset($stat['overdueCount']) ? $stat['overdueCount'] : 0) . '</span>';
 $pageHTML .= '</div>';
+
+$pageHTML .= '<h3>' . $esc($gantt['title']) . '</h3>';
+$pageHTML .= '<div id="zbGanttChart" style="width:100%;height:280px"></div>';
 
 /* 走查提示：中文标签 + 悬停浮层（规则说明）+ 点击弹框（该项目该规则的明细，复用 zoucha 自身 detail 接口） */
 $hasZoucha = !empty($auto['zoucha']);
@@ -106,6 +111,64 @@ panel(
 );
 
 if($hasZoucha) jsVar('window.zhoubaoZouchaDetailURL', helper::createLink('zoucha', 'detail', "projectID=__PID__&rule=__RULE__"));
+
+jsVar('window.zbGanttItems', $gantt['items']);
+jsVar('window.zbGanttEmptyText', $lang->zhoubao->ganttEmpty);
+pageJS(<<<JS
+(function()
+{
+    var el = document.getElementById('zbGanttChart');
+    if(!el) return;
+    var items = window.zbGanttItems || [];
+    if(!items.length){ el.innerHTML = '<div class="zb-gantt-empty">' + (window.zbGanttEmptyText || '') + '</div>'; return; }
+    if(el._chart) return;
+
+    function loadEcharts(cb)
+    {
+        if(window.echarts){ cb(); return; }
+        var src = (window.config && config.webRoot ? config.webRoot : '/') + 'js/echarts/echarts.common.min.js';
+        if(typeof $ != 'undefined' && $.getLib){ $.getLib({src: [src], root: false}, cb); }
+        else { var s = document.createElement('script'); s.src = src; s.onload = cb; document.head.appendChild(s); }
+    }
+
+    loadEcharts(function()
+    {
+        if(!window.echarts || el._chart) return;
+        var names = items.map(function(it){ return it.name; });
+        var data  = items.map(function(it, idx){
+            var s = (new Date(it.start)).getTime();
+            var e = (new Date(it.end)).getTime();
+            return {name: it.name, value: [idx, s, e, it.status], itemStyle: {color: it.color}};
+        });
+        var chart = echarts.init(el);
+        el._chart = chart;
+        var renderItem = function(params, api)
+        {
+            var y = api.coord([0, api.value(0)])[1];
+            var start = api.coord([api.value(1), api.value(0)]);
+            var end   = api.coord([api.value(2), api.value(0)]);
+            var height = api.size([0, 1])[1] * 0.55;
+            var rect = echarts.graphic.clipRectByRect(
+                {x: start[0], y: y - height/2, width: Math.max(end[0]-start[0], 2), height: height},
+                {x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height}
+            );
+            return rect && {type: 'rect', shape: rect, style: api.style()};
+        };
+        chart.setOption({
+            tooltip: {formatter: function(p){
+                var v = p.value;
+                var fmt = function(ts){ var d = new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+                return '<b>' + p.name + '</b><br/>' + v[3] + '<br/>' + fmt(v[1]) + ' ~ ' + fmt(v[2]);
+            }},
+            grid: {left: 120, right: 30, top: 20, bottom: 40},
+            xAxis: {type: 'time'},
+            yAxis: {type: 'category', data: names, axisLabel: {interval: 0}},
+            series: [{type: 'custom', renderItem: renderItem, encode: {x: [1,2], y: 0}, data: data}]
+        });
+        window.addEventListener('resize', function(){ chart.resize(); });
+    });
+})();
+JS);
 
 /* 实测验证（2026-07-02，真实 22.2 实例）：手写 echo "<style>"/"<script>" 在 SPA 内部导航（点链接进入本页）
    时会被 updatePageWithHtml() 过滤/不可靠，统一改用官方 css()/pageJS() 通道，与 edit/browse 页一致。 */
