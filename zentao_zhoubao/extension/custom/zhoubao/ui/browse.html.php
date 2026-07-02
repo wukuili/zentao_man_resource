@@ -14,21 +14,24 @@ $weekStart = (string)$this->view->weekStart;
 $rows      = $this->view->rows;
 $pm        = (string)$this->view->pm;
 $fill      = (string)$this->view->fill;
+$risk      = (string)$this->view->risk;
 
-$statusList = $lang->zhoubao->statusList;
+$statusList  = $lang->zhoubao->statusList;
+$hasRiskList = $lang->zhoubao->hasRiskList;
 
 $range    = $weekStart . ' ~ ' . date('Y-m-d', strtotime($weekStart . ' +6 days'));
 $pmParam   = ($pm   === '') ? 'all' : $pm;
 $fillParam = ($fill === '') ? 'all' : $fill;
+$riskParam = ($risk === '') ? 'all' : $risk;
 
 /* 周切换：以本周一为基准前后移动 7 天，URL 中日期用下划线（禅道 PATH_INFO 路由约定） */
 $prevWeek = str_replace('-', '_', date('Y-m-d', strtotime($weekStart . ' -7 days')));
 $nextWeek = str_replace('-', '_', date('Y-m-d', strtotime($weekStart . ' +7 days')));
 $curWeek  = str_replace('-', '_', $weekStart);
 
-$prevURL = helper::createLink('zhoubao', 'browse', "week={$prevWeek}&pm={$pmParam}&fill={$fillParam}");
-$curURL  = helper::createLink('zhoubao', 'browse', "week=&pm={$pmParam}&fill={$fillParam}");
-$nextURL = helper::createLink('zhoubao', 'browse', "week={$nextWeek}&pm={$pmParam}&fill={$fillParam}");
+$prevURL = helper::createLink('zhoubao', 'browse', "week={$prevWeek}&pm={$pmParam}&fill={$fillParam}&risk={$riskParam}");
+$curURL  = helper::createLink('zhoubao', 'browse', "week=&pm={$pmParam}&fill={$fillParam}&risk={$riskParam}");
+$nextURL = helper::createLink('zhoubao', 'browse', "week={$nextWeek}&pm={$pmParam}&fill={$fillParam}&risk={$riskParam}");
 
 /* PM 下拉：按当前行集合去重（仅列出本周活跃项目里出现过的 PM），展示真实姓名、值仍为账号 */
 $pmOptions = array();
@@ -62,9 +65,19 @@ foreach($statusList as $key => $label)
 }
 $filterHTML .= '</select>';
 
+$filterHTML .= '<label style="margin-left:12px">' . htmlspecialchars($lang->zhoubao->hasRiskQuestion) . '</label>';
+$filterHTML .= '<select id="zbFilterRisk" class="form-control" style="max-width:140px">';
+$filterHTML .= '<option value="all"' . ($risk === '' || $risk === 'all' ? ' selected' : '') . '>全部</option>';
+foreach($hasRiskList as $key => $label)
+{
+    $sel = ($risk === $key) ? ' selected' : '';
+    $filterHTML .= '<option value="' . htmlspecialchars((string)$key) . '"' . $sel . '>' . htmlspecialchars($label) . '</option>';
+}
+$filterHTML .= '</select>';
+
 $filterHTML .= '<button type="button" class="btn btn-primary btn-sm" onclick="zbSubmitFilter()" style="margin-left:8px">筛选</button>';
 $filterHTML .= '<button type="button" class="btn btn-default btn-sm" onclick="zbResetFilter()">重置</button>';
-$filterHTML .= '<a class="btn btn-default btn-sm" href="' . helper::createLink('zhoubao', 'export', "type=board&week={$curWeek}") . '" style="margin-left:8px">' . htmlspecialchars($lang->zhoubao->export) . '</a>';
+$filterHTML .= '<a class="btn btn-default btn-sm" href="' . helper::createLink('zhoubao', 'export', "type=board&week={$curWeek}&risk={$riskParam}") . '" style="margin-left:8px">' . htmlspecialchars($lang->zhoubao->export) . '</a>';
 if(common::hasPriv('zhoubao', 'manage'))
 {
     $filterHTML .= '<a class="btn btn-primary btn-sm" href="javascript:;" id="btnPushNow" data-url="' . helper::createLink('zhoubao', 'pushNow', "week={$curWeek}") . '" style="margin-left:8px">' . htmlspecialchars($lang->zhoubao->pushNow) . '</a>';
@@ -131,7 +144,7 @@ else
 $tableHTML .= '</tbody></table></div>';
 
 /* 筛选跳转：切换 PM/填报状态下拉后原地提交，周次维持当前 weekStart 不变 */
-jsVar('window.zhoubaoFilterURL', helper::createLink('zhoubao', 'browse', "week={$curWeek}&pm=__PM__&fill=__FILL__"));
+jsVar('window.zhoubaoFilterURL', helper::createLink('zhoubao', 'browse', "week={$curWeek}&pm=__PM__&fill=__FILL__&risk=__RISK__"));
 
 panel(
     set::title($lang->zhoubao->browseTitle . ' · ' . $range),
@@ -155,12 +168,13 @@ pageJS(<<<JS
     {
         var pm   = document.getElementById('zbFilterPM').value;
         var fill = document.getElementById('zbFilterFill').value;
-        var url  = window.zhoubaoFilterURL.replace('__PM__', encodeURIComponent(pm)).replace('__FILL__', encodeURIComponent(fill));
+        var risk = document.getElementById('zbFilterRisk').value;
+        var url  = window.zhoubaoFilterURL.replace('__PM__', encodeURIComponent(pm)).replace('__FILL__', encodeURIComponent(fill)).replace('__RISK__', encodeURIComponent(risk));
         window.location.href = url;
     };
     window.zbResetFilter = function()
     {
-        var url = window.zhoubaoFilterURL.replace('__PM__', 'all').replace('__FILL__', 'all');
+        var url = window.zhoubaoFilterURL.replace('__PM__', 'all').replace('__FILL__', 'all').replace('__RISK__', 'all');
         window.location.href = url;
     };
 

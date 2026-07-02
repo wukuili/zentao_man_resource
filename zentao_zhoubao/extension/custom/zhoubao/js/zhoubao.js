@@ -9,8 +9,10 @@
 
   function collect(){
     var form = document.getElementById('zbEditForm');
+    var hasRiskEl = form.querySelector('input[name="hasRisk"]:checked');
     return {
       nextPlan: form.nextPlan.value,
+      hasRisk:  hasRiskEl ? hasRiskEl.value : 'no',
       risk:     form.risk.value,
       summary:  form.summary.value
     };
@@ -24,6 +26,19 @@
     var body = Object.keys(data).map(function(k){ return encodeURIComponent(k)+'='+encodeURIComponent(data[k]); }).join('&');
     xhr.send(body);
   }
+  function toggleRiskDetail(){
+    var form = document.getElementById('zbEditForm');
+    if(!form) return;
+    var checked = form.querySelector('input[name="hasRisk"]:checked');
+    var detail = document.getElementById('zbRiskDetail');
+    if(!detail) return;
+    var isYes = checked && checked.value === 'yes';
+    detail.style.display = isYes ? '' : 'none';
+    if(!isYes) form.risk.value = '';
+  }
+  var riskRadios = document.querySelectorAll('input[name="hasRisk"]');
+  for(var i = 0; i < riskRadios.length; i++) riskRadios[i].addEventListener('change', toggleRiskDetail);
+
   window.zbSaveDraft = function(){
     post(window.zbSaveURL, collect(), function(res){
       if(res.result === 'success'){ if(res.locate) location.href = res.locate; else location.reload(); }
@@ -44,6 +59,9 @@
         form.nextPlan.value = res.data.nextPlan || '';
         form.risk.value = res.data.risk || '';
         form.summary.value = res.data.summary || '';
+        var wantYes = res.data.hasRisk === 'yes';
+        var radio = form.querySelector('input[name="hasRisk"][value="' + (wantYes ? 'yes' : 'no') + '"]');
+        if(radio){ radio.checked = true; toggleRiskDetail(); }
       } else alert(res.message || '上周暂无周报');
     });
   };

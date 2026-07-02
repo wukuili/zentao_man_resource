@@ -7,20 +7,22 @@ class zhoubao extends control
      * @param string $pm   项目经理筛选（'' 或 'all' 表示全部）
      * @param string $fill 填报状态筛选（'' / all / none / draft / submitted）
      */
-    public function browse($week = '', $pm = '', $fill = '')
+    public function browse($week = '', $pm = '', $fill = '', $risk = '')
     {
         $week = isset($_GET['week']) ? (string)$_GET['week'] : (string)$week;
         $pm   = isset($_GET['pm'])   ? (string)$_GET['pm']   : (string)$pm;
         $fill = isset($_GET['fill']) ? (string)$_GET['fill'] : (string)$fill;
+        $risk = isset($_GET['risk']) ? (string)$_GET['risk'] : (string)$risk;
 
-        $weekStart = $this->zhoubao->resolveWeekStart($week); // Task 4 提供
-        $rows      = $this->zhoubao->getBoardRows($weekStart, $pm, $fill); // Task 4 提供
+        $weekStart = $this->zhoubao->resolveWeekStart($week);
+        $rows      = $this->zhoubao->getBoardRows($weekStart, $pm, $fill, $risk);
 
         $this->view->title     = $this->lang->zhoubao->browseTitle;
         $this->view->weekStart = $weekStart;
         $this->view->rows      = $rows;
         $this->view->pm        = $pm;
         $this->view->fill      = $fill;
+        $this->view->risk      = $risk;
         $this->display();
     }
 
@@ -73,7 +75,7 @@ class zhoubao extends control
         $prev = $this->zhoubao->getPrevReport($project, $weekStart);
         if(!$prev) return $this->send(array('result' => 'fail', 'message' => '上周暂无周报'));
         return $this->send(array('result' => 'success', 'data' => array(
-            'nextPlan' => $prev->nextPlan, 'risk' => $prev->risk, 'summary' => $prev->summary,
+            'nextPlan' => $prev->nextPlan, 'risk' => $prev->risk, 'hasRisk' => $prev->hasRisk, 'summary' => $prev->summary,
         )));
     }
 
@@ -112,7 +114,7 @@ class zhoubao extends control
      * @param string $week 周起始日（board 用）
      * @param int    $id   周报 ID（one 用）
      */
-    public function export($type = 'board', $week = '', $id = 0)
+    public function export($type = 'board', $week = '', $id = 0, $risk = '')
     {
         $filename = 'zhoubao_' . date('Ymd') . '.csv';
         header('Content-Type: text/csv; charset=utf-8');
@@ -120,20 +122,21 @@ class zhoubao extends control
         echo "\xEF\xBB\xBF"; // UTF-8 BOM，Excel 正确识别中文
 
         $out = fopen('php://output', 'w');
+        $hasRiskList = $this->lang->zhoubao->hasRiskList;
         if($type === 'one' && $id)
         {
             $r = $this->dao->select('*')->from('zt_zhoubao')->where('id')->eq((int)$id)->fetch();
             $p = $r ? $this->dao->select('name')->from(TABLE_PROJECT)->where('id')->eq($r->project)->fetch('name') : '';
-            fputcsv($out, array('项目', '周次', '下周计划', '风险', '本周小结'));
-            if($r) fputcsv($out, array($this->csvSafe($p), '第' . $r->week . '周', $this->csvSafe($r->nextPlan), $this->csvSafe($r->risk), $this->csvSafe($r->summary)));
+            fputcsv($out, array('项目', '周次', '下周计划', '是否有风险', '风险', '本周小结'));
+            if($r) fputcsv($out, array($this->csvSafe($p), '第' . $r->week . '周', $this->csvSafe($r->nextPlan), zget($hasRiskList, $r->hasRisk, $r->hasRisk), $this->csvSafe($r->risk), $this->csvSafe($r->summary)));
         }
         else
         {
             $weekStart = $this->zhoubao->resolveWeekStart($week);
-            $rows = $this->zhoubao->getBoardRows($weekStart, '', '');
+            $rows = $this->zhoubao->getBoardRows($weekStart, '', '', $risk);
             $labels = $this->lang->zhoubao->statusList;
-            fputcsv($out, array('项目', '项目经理', '填报状态', '本周完成', '逾期任务'));
-            foreach($rows as $r) fputcsv($out, array($this->csvSafe($r->projectName), $this->csvSafe($r->pmName), zget($labels, $r->status, $r->status), $r->doneCount, $r->overdueCount));
+            fputcsv($out, array('项目', '项目经理', '填报状态', '是否有风险', '本周完成', '逾期任务'));
+            foreach($rows as $r) fputcsv($out, array($this->csvSafe($r->projectName), $this->csvSafe($r->pmName), zget($labels, $r->status, $r->status), zget($hasRiskList, $r->hasRisk, $r->hasRisk), $r->doneCount, $r->overdueCount));
         }
         fclose($out);
         exit;

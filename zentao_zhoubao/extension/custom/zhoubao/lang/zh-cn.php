@@ -20,6 +20,8 @@ $lang->zhoubao->undoneTasks = '本周未完成/逾期任务';
 $lang->zhoubao->statOverview= '进度/工时概览';
 $lang->zhoubao->nextPlan    = '下周计划';
 $lang->zhoubao->risk        = '风险与需协调资源';
+$lang->zhoubao->hasRiskQuestion = '是否有风险及需协调资源';
+$lang->zhoubao->hasRiskList     = array('yes' => '是', 'no' => '否');
 $lang->zhoubao->summary     = '本周总结';
 
 /* 走查提示标签：账号维护独立于 zoucha 插件的中文文案，避免依赖 zoucha 的 lang（单语言部署下不保证自动加载） */

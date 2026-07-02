@@ -90,7 +90,12 @@ $pageHTML .= '<h3>' . $esc($lang->zhoubao->undoneTasks) . '</h3>';
 $pageHTML .= '<table class="zb-table"><thead><tr><th>任务</th><th>负责人</th><th>时间</th></tr></thead><tbody>' . ($undoneRows ?: '<tr><td colspan="3">无</td></tr>') . '</tbody></table>';
 
 $pageHTML .= '<h3>' . $esc($lang->zhoubao->nextPlan) . '</h3><p>' . nl2br($esc($report->nextPlan)) . '</p>';
-$pageHTML .= '<h3>' . $esc($lang->zhoubao->risk) . '</h3><p>' . nl2br($esc($report->risk)) . '</p>';
+
+$hasRisk      = ($report->hasRisk === 'yes') ? 'yes' : 'no';
+$riskBadgeCls = 'zb-risk-badge zb-risk-' . $hasRisk;
+$riskBadgeTxt = $lang->zhoubao->hasRiskList[$hasRisk];
+$pageHTML .= '<h3>' . $esc($lang->zhoubao->risk) . '<span class="' . $riskBadgeCls . '">' . $esc($riskBadgeTxt) . '</span></h3>';
+if($hasRisk === 'yes') $pageHTML .= '<p>' . nl2br($esc($report->risk)) . '</p>';
 
 panel(
     set::title($this->view->title . ' · ' . $esc($project->name) . ' · 第' . (int)$report->week . '周'),

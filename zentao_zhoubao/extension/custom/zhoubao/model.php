@@ -73,7 +73,7 @@ class zhoubaoModel extends model
     }
 
     /* 看板行 */
-    public function getBoardRows($weekStart, $pm = '', $fill = '')
+    public function getBoardRows($weekStart, $pm = '', $fill = '', $risk = '')
     {
         /* 加载规则引擎（无禅道依赖，可独立 php -l 校验） */
         if(!class_exists('zhoubaoRules'))
@@ -103,12 +103,17 @@ class zhoubaoModel extends model
 
             if($fill !== '' && $fill !== 'all' && $status !== $fill) continue;
 
+            /* 无周报的项目一律按"无风险"归类，供 risk 筛选使用 */
+            $hasRisk = ($report && $report->hasRisk === 'yes') ? 'yes' : 'no';
+            if($risk !== '' && $risk !== 'all' && $hasRisk !== $risk) continue;
+
             $rows[] = (object)array(
                 'project'      => $pid,
                 'projectName'  => $project->name,
                 'pm'           => $project->PM,
                 'pmName'       => isset($pmNames[$project->PM]) && $pmNames[$project->PM] !== '' ? $pmNames[$project->PM] : $project->PM,
                 'status'       => $status,
+                'hasRisk'      => $hasRisk,
                 'doneCount'    => count($cls['done']),
                 'overdueCount' => count($cls['overdue']),
                 'reportID'     => $report ? $report->id : 0,
@@ -256,9 +261,14 @@ class zhoubaoModel extends model
         $now   = helper::now();
         $exist = $this->getReport($project, $weekStart);
 
+        /* 白名单校验，非 'yes' 一律按 'no' 处理 */
+        $hasRisk = (isset($post['hasRisk']) && $post['hasRisk'] === 'yes') ? 'yes' : 'no';
+
         $data = new stdclass();
         $data->nextPlan  = isset($post['nextPlan']) ? $post['nextPlan'] : '';
-        $data->risk      = isset($post['risk'])     ? $post['risk']     : '';
+        $data->hasRisk   = $hasRisk;
+        /* 选"否"时服务端强制清空风险文本，防止前端隐藏后仍提交的残留值存进数据库/snapshot */
+        $data->risk      = ($hasRisk === 'yes' && isset($post['risk'])) ? $post['risk'] : '';
         $data->summary   = isset($post['summary'])  ? $post['summary']  : '';
         $data->editedDate= $now;
         if($submit)

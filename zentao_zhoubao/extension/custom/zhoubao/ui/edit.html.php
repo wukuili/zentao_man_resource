@@ -87,7 +87,13 @@ $pageHTML .= '<h3>' . $esc($lang->zhoubao->undoneTasks) . '</h3>';
 $pageHTML .= '<table class="zb-table"><thead><tr><th>任务</th><th>负责人</th><th>截止</th><th>状态</th></tr></thead><tbody>' . ($undoneRowsHTML ?: '<tr><td colspan="4">本周暂无未完成任务</td></tr>') . '</tbody></table>';
 
 $pageHTML .= '<div class="zb-form-group"><label>' . $esc($lang->zhoubao->nextPlan) . '</label><textarea name="nextPlan" class="form-control" rows="4">' . $esc($report ? $report->nextPlan : '') . '</textarea></div>';
-$pageHTML .= '<div class="zb-form-group"><label>' . $esc($lang->zhoubao->risk) . '</label><textarea name="risk" class="form-control" rows="4">' . $esc($report ? $report->risk : '') . '</textarea></div>';
+
+$hasRisk = ($report && $report->hasRisk === 'yes') ? 'yes' : 'no';
+$pageHTML .= '<div class="zb-form-group"><label>' . $esc($lang->zhoubao->hasRiskQuestion) . '</label>';
+$pageHTML .= '<label class="zb-radio-inline"><input type="radio" name="hasRisk" value="yes"' . ($hasRisk === 'yes' ? ' checked' : '') . '> ' . $esc($lang->zhoubao->hasRiskList['yes']) . '</label>';
+$pageHTML .= '<label class="zb-radio-inline"><input type="radio" name="hasRisk" value="no"' . ($hasRisk === 'no' ? ' checked' : '') . '> ' . $esc($lang->zhoubao->hasRiskList['no']) . '</label>';
+$pageHTML .= '</div>';
+$pageHTML .= '<div class="zb-form-group" id="zbRiskDetail" style="' . ($hasRisk === 'yes' ? '' : 'display:none') . '"><label>' . $esc($lang->zhoubao->risk) . '</label><textarea name="risk" class="form-control" rows="4">' . $esc($report ? $report->risk : '') . '</textarea></div>';
 $pageHTML .= '<div class="zb-form-actions">';
 $pageHTML .= '<button type="button" class="btn btn-default" onclick="zbCopyLast()">' . $esc($lang->zhoubao->copyLast) . '</button> ';
 $pageHTML .= '<button type="button" class="btn btn-default" onclick="zbSaveDraft()">' . $esc($lang->zhoubao->saveDraft) . '</button> ';
