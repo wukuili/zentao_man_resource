@@ -1,3 +1,8 @@
+.zb-filter-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.zb-filter-bar .zb-week-nav{display:inline-flex;gap:4px}
+.zb-filter-bar label{margin:0 2px 0 12px;font-weight:600;white-space:nowrap}
+.zb-filter-bar select.form-control{display:inline-block;width:auto;max-width:160px;height:30px}
+.zb-table-wrap{overflow-x:auto}
 .zb-stat-cards{display:flex;gap:12px;margin:8px 0}
 .zb-stat-cards span{padding:6px 12px;background:#f2f5fa;border-radius:6px;font-weight:600}
 .zb-table{width:100%;border-collapse:collapse;margin-bottom:16px}
