@@ -25,13 +25,13 @@ class zhoubaoModel extends model
         );
     }
 
-    /* 活跃项目：type=project、未删除、非关闭 */
+    /* 活跃项目：type=project、未删除、仅进行中（挂起/未开始/关闭均不纳入） */
     public function getActiveProjects()
     {
         return $this->dao->select('id, name, PM')->from(TABLE_PROJECT)
             ->where('type')->eq('project')
             ->andWhere('deleted')->eq('0')
-            ->andWhere('status')->ne('closed')
+            ->andWhere('status')->eq('doing')
             ->fetchAll('id');
     }
 
@@ -134,6 +134,21 @@ class zhoubaoModel extends model
         return $pmNames;
     }
 
+    /* 账号 => 真实姓名，用于任务负责人展示（$accounts 为 account => account 的去重集合） */
+    public function getUserNames($accounts)
+    {
+        if(empty($accounts)) return array();
+
+        $users = $this->dao->select('account, realname')
+            ->from(TABLE_USER)
+            ->where('account')->in(array_values($accounts))
+            ->fetchAll('account');
+
+        $names = array();
+        foreach($users as $u) $names[$u->account] = $u->realname;
+        return $names;
+    }
+
     /* 本周消耗工时：zt_effort.date 落在本周的 consumed 之和 */
     public function getWeekEffort($project, $start, $end)
     {
@@ -158,6 +173,23 @@ class zhoubaoModel extends model
         $tasksByProject = $this->getProjectTasks(array($project));
         $tasks = isset($tasksByProject[$project]) ? $tasksByProject[$project] : array();
         $cls   = zhoubaoRules::classifyTasks($tasks, $range['start'], $range['end'], $today);
+
+        /* 负责人账号 => 真实姓名，补进每条任务行，供模板展示（与 getPmNames 同款查询） */
+        $accounts = array();
+        foreach(array('done', 'undone', 'overdue') as $k)
+        {
+            foreach($cls[$k] as $t) if(!empty($t['assignedTo'])) $accounts[$t['assignedTo']] = $t['assignedTo'];
+        }
+        $userNames = $this->getUserNames($accounts);
+        foreach(array('done', 'undone', 'overdue') as $k)
+        {
+            foreach($cls[$k] as &$t)
+            {
+                $t['assignedToName'] = isset($userNames[$t['assignedTo']]) && $userNames[$t['assignedTo']] !== ''
+                    ? $userNames[$t['assignedTo']] : $t['assignedTo'];
+            }
+            unset($t);
+        }
 
         $totalLeft = 0;
         foreach($cls['undone'] as $t)  $totalLeft += (float)(isset($t['left']) ? $t['left'] : 0);

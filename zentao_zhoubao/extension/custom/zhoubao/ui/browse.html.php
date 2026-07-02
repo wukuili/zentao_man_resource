@@ -79,8 +79,12 @@ $tableHTML .= '<th style="width:100px">' . htmlspecialchars($lang->zhoubao->pm) 
 $tableHTML .= '<th style="width:90px">' . htmlspecialchars($lang->zhoubao->fillStatus) . '</th>';
 $tableHTML .= '<th style="width:90px">' . htmlspecialchars($lang->zhoubao->doneCount) . '</th>';
 $tableHTML .= '<th style="width:90px">' . htmlspecialchars($lang->zhoubao->overdueCount) . '</th>';
-$tableHTML .= '<th style="width:100px">' . htmlspecialchars($lang->zhoubao->actions) . '</th>';
+$tableHTML .= '<th style="width:150px">' . htmlspecialchars($lang->zhoubao->actions) . '</th>';
 $tableHTML .= '</tr></thead><tbody>';
+
+/* 编辑按钮可见性：manage 权限者或本行项目 PM，与 control::edit()/view() 的权限判断一致 */
+$canManage  = common::hasPriv('zhoubao', 'manage');
+$curAccount = $this->app->user->account;
 
 if(empty($rows))
 {
@@ -98,15 +102,21 @@ else
 
         if($r->status === 'submitted')
         {
-            $actionURL  = helper::createLink('zhoubao', 'view', "id={$r->reportID}");
-            $actionText = $lang->zhoubao->viewReport;
+            $viewURL    = helper::createLink('zhoubao', 'view', "id={$r->reportID}");
+            $actionCell = '<a class="btn btn-default btn-sm" href="' . $viewURL . '">' . htmlspecialchars($lang->zhoubao->viewReport) . '</a>';
+
+            /* 已提交周报仍可编辑：manage 权限者或本项目 PM 才显示编辑入口 */
+            if($canManage || $r->pm === $curAccount)
+            {
+                $editURL     = helper::createLink('zhoubao', 'edit', "project={$r->project}&week={$curWeek}");
+                $actionCell .= ' <a class="btn btn-primary btn-sm" href="' . $editURL . '">' . htmlspecialchars($lang->zhoubao->editReport) . '</a>';
+            }
         }
         else
         {
             $actionURL  = helper::createLink('zhoubao', 'edit', "project={$r->project}&week={$curWeek}");
-            $actionText = $lang->zhoubao->writeReport;
+            $actionCell = '<a class="btn btn-default btn-sm" href="' . $actionURL . '">' . htmlspecialchars($lang->zhoubao->writeReport) . '</a>';
         }
-        $actionCell = '<a class="btn btn-default btn-sm" href="' . $actionURL . '">' . htmlspecialchars($actionText) . '</a>';
 
         $tableHTML .= '<tr>';
         $tableHTML .= '<td>' . $nameCell . '</td>';
@@ -128,12 +138,19 @@ panel(
     html($filterHTML . $tableHTML)
 );
 
-/* ── 内联 JS：读取下拉值拼回筛选 URL 并跳转 ── */
-echo <<<JS
-<script>
+/* 实测验证（2026-07-02，真实 22.2 实例）：ZenTao SPA 前端 www/js/zui3/zin.js 的 updatePageWithHtml()
+   会把 main/body 内容里的裸 <script>（除 window.config= 那个特例）整体过滤掉，只有通过 pageJS()/css()
+   （即 context::addJS/addCSS，落在专门的 <script class="zin-page-js">/<style class="zin-page-css"> 占位符里，
+   SPA 用 $('script.zin-page-js').replaceWith(data) 重建执行）才能在“点击链接跳转”这种 SPA 内部导航场景下生效。
+   之前手写 echo "<style>"/"<script>" 只在整页原生刷新时凑巧能跑，点内部链接进来就会静默失效，故改用官方通道。 */
+$cssPath = $app->getAppRoot() . 'extension/custom/zhoubao/css/common.css';
+if(is_file($cssPath)) css(file_get_contents($cssPath));
+
+/* ── pageJS：读取下拉值拼回筛选 URL 并跳转 ── */
+pageJS(<<<JS
 (function()
 {
-    if(window.zbSubmitFilter) return; // 守卫：ZIN 脚本重复执行时不重复绑定
+    if(window.zbSubmitFilter) return; // 守卫：pageJS 每次页面更新都会重新执行，避免重复绑定
     window.zbSubmitFilter = function()
     {
         var pm   = document.getElementById('zbFilterPM').value;
@@ -157,5 +174,4 @@ echo <<<JS
         xhr.send('');
     });
 })();
-</script>
-JS;
+JS);

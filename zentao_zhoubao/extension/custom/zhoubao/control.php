@@ -87,10 +87,14 @@ class zhoubao extends control
         if(!$report) return print('周报不存在');
         $projectInfo = $this->dao->select('id, name, PM')->from(TABLE_PROJECT)->where('id')->eq($report->project)->fetch();
 
+        /* 编辑按钮可见性：manage 权限者或本项目 PM 才能编辑已提交周报，与 edit() 的权限判断一致 */
+        $canEdit = common::hasPriv('zhoubao', 'manage') || ($projectInfo && $projectInfo->PM === $this->app->user->account);
+
         $this->view->title       = $this->lang->zhoubao->viewTitle;
         $this->view->report      = $report;
         $this->view->projectInfo = $projectInfo;
         $this->view->auto        = $report->snapshot ? json_decode($report->snapshot, true) : array('done'=>array(),'undone'=>array(),'overdue'=>array(),'stat'=>array());
+        $this->view->canEdit     = $canEdit;
         $this->display();
     }
 
