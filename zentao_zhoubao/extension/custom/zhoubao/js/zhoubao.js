@@ -22,7 +22,23 @@
     xhr.open('POST', url, true);
     xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
     xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-    xhr.onload = function(){ try{ cb(JSON.parse(xhr.responseText)); }catch(e){ cb({result:'fail',message:'返回解析失败'}); } };
+    xhr.onload = function(){
+      try{
+        cb(JSON.parse(xhr.responseText));
+      }catch(e){
+        var msg = '返回解析失败';
+        if(xhr.status !== 200) msg = 'HTTP ' + xhr.status + ': ' + msg;
+        if(xhr.responseText && xhr.responseText.length > 0){
+          if(xhr.responseText.length > 200){
+            msg += '（' + xhr.responseText.substring(0, 200) + '...)';
+          }else{
+            msg += '（' + xhr.responseText + ')';
+          }
+        }
+        cb({result:'fail',message:msg});
+      }
+    };
+    xhr.onerror = function(){ cb({result:'fail',message:'网络请求失败'}); };
     var body = Object.keys(data).map(function(k){ return encodeURIComponent(k)+'='+encodeURIComponent(data[k]); }).join('&');
     xhr.send(body);
   }

@@ -48,9 +48,14 @@ class zhoubao extends control
 
         if($this->server->request_method == 'POST')
         {
+            @ob_clean();
             $submit = !empty($_POST['submit']);
             $id = $this->zhoubao->saveReport($project, $weekStart, $_POST, $this->app->user->account, $submit);
-            if($id === false) return $this->send(array('result' => 'fail', 'message' => dao::getError()));
+            if($id === false)
+            {
+                $error = dao::getError();
+                return $this->send(array('result' => 'fail', 'message' => $error ? $error : '保存失败'));
+            }
             $locate = $submit ? inlink('view', "id=$id") : inlink('edit', "project=$project&week=" . str_replace('-', '_', $weekStart));
             return $this->send(array('result' => 'success', 'locate' => $locate));
         }
@@ -72,6 +77,7 @@ class zhoubao extends control
      */
     public function copyLast($project, $week = '')
     {
+        @ob_clean();
         $project   = (int)$project;
         $weekStart = $this->zhoubao->resolveWeekStart(isset($_GET['week']) ? $_GET['week'] : $week);
         $prev = $this->zhoubao->getPrevReport($project, $weekStart);
