@@ -4,16 +4,13 @@
  * 原生 XHR POST 并带 X-Requested-With，避免禅道 20 对非 AJAX POST 的 302 跳转空白页。
  */
 (function(){
-  if(window.__zhoubaoBound) return;
-  window.__zhoubaoBound = true;
-
   function collect(){
     var form = document.getElementById('zbEditForm');
     var hasRiskEl = form.querySelector('input[name="hasRisk"]:checked');
     return {
       nextPlan: form.nextPlan.value,
       hasRisk:  hasRiskEl ? hasRiskEl.value : 'no',
-      risk:     form.risk.value,
+      risk:     form.risk ? form.risk.value : '',
       summary:  form.summary.value
     };
   }
@@ -42,18 +39,33 @@
     var body = Object.keys(data).map(function(k){ return encodeURIComponent(k)+'='+encodeURIComponent(data[k]); }).join('&');
     xhr.send(body);
   }
-  function toggleRiskDetail(){
-    var form = document.getElementById('zbEditForm');
+  function toggleRiskDetail(form){
+    form = form || document.getElementById('zbEditForm');
     if(!form) return;
     var checked = form.querySelector('input[name="hasRisk"]:checked');
     var detail = document.getElementById('zbRiskDetail');
     if(!detail) return;
     var isYes = checked && checked.value === 'yes';
     detail.style.display = isYes ? '' : 'none';
-    if(!isYes) form.risk.value = '';
+    if(!isYes && form.risk) form.risk.value = '';
   }
-  var riskRadios = document.querySelectorAll('input[name="hasRisk"]');
-  for(var i = 0; i < riskRadios.length; i++) riskRadios[i].addEventListener('change', toggleRiskDetail);
+  window.zbToggleRiskDetail = toggleRiskDetail;
+
+  if(!window.__zhoubaoRiskDelegated){
+    window.__zhoubaoRiskDelegated = true;
+    document.addEventListener('change', function(e){
+      var target = e.target;
+      if(target && target.name === 'hasRisk') toggleRiskDetail(target.form || document.getElementById('zbEditForm'));
+    });
+  }
+
+  function bindRiskDetail(){
+    var form = document.getElementById('zbEditForm');
+    if(!form || form.__zhoubaoRiskBound) return;
+    form.__zhoubaoRiskBound = true;
+    toggleRiskDetail(form);
+  }
+  bindRiskDetail();
 
   window.zbSaveDraft = function(){
     post(window.zbSaveURL, collect(), function(res){
@@ -73,7 +85,7 @@
       if(res.result === 'success' && res.data){
         var form = document.getElementById('zbEditForm');
         form.nextPlan.value = res.data.nextPlan || '';
-        form.risk.value = res.data.risk || '';
+        if(form.risk) form.risk.value = res.data.risk || '';
         form.summary.value = res.data.summary || '';
         var wantYes = res.data.hasRisk === 'yes';
         var radio = form.querySelector('input[name="hasRisk"][value="' + (wantYes ? 'yes' : 'no') + '"]');

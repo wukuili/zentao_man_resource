@@ -5,6 +5,29 @@
  */
 class zhoubaoModel extends model
 {
+    private $schemaChecked = false;
+
+    /* 后台插件覆盖安装旧版本时可能不会执行独立 upgrade SQL，首次访问时兜底补齐新增列。 */
+    private function ensureSchema()
+    {
+        if($this->schemaChecked) return true;
+        $this->schemaChecked = true;
+
+        try
+        {
+            $column = $this->dao->query("SHOW COLUMNS FROM `zt_zhoubao` LIKE 'hasRisk'")->fetch();
+            if($column) return true;
+
+            $this->dbh->query("ALTER TABLE `zt_zhoubao` ADD COLUMN `hasRisk` enum('yes','no') NOT NULL DEFAULT 'no' COMMENT '是否有风险/需协调资源' AFTER `risk`");
+            $this->dbh->query("UPDATE `zt_zhoubao` SET `hasRisk` = 'yes' WHERE `risk` IS NOT NULL AND `risk` != ''");
+            return true;
+        }
+        catch(Throwable $e)
+        {
+            return false;
+        }
+    }
+
     /* 把 week 参数（2026_06_29 或 ''）解析成本周一的 Y-m-d */
     public function resolveWeekStart($week = '')
     {
@@ -66,6 +89,7 @@ class zhoubaoModel extends model
     /* 某年某周所有已存周报，projectID => 行对象 */
     public function getReportMap($year, $week)
     {
+        $this->ensureSchema();
         return $this->dao->select('*')->from('zt_zhoubao')
             ->where('year')->eq($year)
             ->andWhere('week')->eq($week)
@@ -239,6 +263,7 @@ class zhoubaoModel extends model
 
     public function getReport($project, $weekStart)
     {
+        $this->ensureSchema();
         $range = $this->getWeekRange($weekStart);
         return $this->dao->select('*')->from('zt_zhoubao')
             ->where('project')->eq($project)
@@ -302,6 +327,7 @@ class zhoubaoModel extends model
     /* 保存草稿或提交；提交时固化 snapshot */
     public function saveReport($project, $weekStart, $post, $account, $submit)
     {
+        $this->ensureSchema();
         $range = $this->getWeekRange($weekStart);
         $now   = helper::now();
         $exist = $this->getReport($project, $weekStart);

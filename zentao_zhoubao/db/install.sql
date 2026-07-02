@@ -19,3 +19,8 @@ CREATE TABLE IF NOT EXISTS `zt_zhoubao` (
   KEY `idx_week` (`year`,`week`),
   KEY `idx_account` (`account`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+
+ALTER TABLE `zt_zhoubao`
+  ADD COLUMN IF NOT EXISTS `hasRisk` enum('yes','no') NOT NULL DEFAULT 'no' COMMENT '是否有风险/需协调资源' AFTER `risk`;
+
+UPDATE `zt_zhoubao` SET `hasRisk` = 'yes' WHERE `risk` IS NOT NULL AND `risk` != '';

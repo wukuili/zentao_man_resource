@@ -128,7 +128,8 @@ class zhoubao extends control
     {
         $filename = 'zhoubao_' . date('Ymd') . '.csv';
         header('Content-Type: text/csv; charset=utf-8');
-        header("Content-Disposition: attachment; filename=$filename");
+        header('Content-Disposition: attachment; filename="' . $filename . '"; filename*=UTF-8\'\'' . rawurlencode($filename));
+        header('Cache-Control: no-store');
         echo "\xEF\xBB\xBF"; // UTF-8 BOM，Excel 正确识别中文
 
         $out = fopen('php://output', 'w');

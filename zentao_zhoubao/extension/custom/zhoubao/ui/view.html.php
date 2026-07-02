@@ -119,56 +119,67 @@ jsVar('window.zbGanttEmptyText', $lang->zhoubao->ganttEmpty);
 pageJS(<<<JS
 (function()
 {
-    var el = document.getElementById('zbGanttChart');
-    if(!el) return;
-    var items = window.zbGanttItems || [];
-    if(!items.length){ el.innerHTML = '<div class="zb-gantt-empty">' + (window.zbGanttEmptyText || '') + '</div>'; return; }
-    if(el._chart) return;
-
-    function loadEcharts(cb)
+    window.zbInitGantt = function(attempt)
     {
-        if(window.echarts){ cb(); return; }
-        var src = (window.config && config.webRoot ? config.webRoot : '/') + 'js/echarts/echarts.common.min.js';
-        if(typeof $ != 'undefined' && $.getLib){ $.getLib({src: [src], root: false}, cb); }
-        else { var s = document.createElement('script'); s.src = src; s.onload = cb; document.head.appendChild(s); }
-    }
-
-    loadEcharts(function()
-    {
-        if(!window.echarts || el._chart) return;
-        var names = items.map(function(it){ return it.name; });
-        var data  = items.map(function(it, idx){
-            var s = (new Date(it.start)).getTime();
-            var e = (new Date(it.end)).getTime();
-            return {name: it.name, value: [idx, s, e, it.status], itemStyle: {color: it.color}};
-        });
-        var chart = echarts.init(el);
-        el._chart = chart;
-        var renderItem = function(params, api)
+        attempt = attempt || 0;
+        var el = document.getElementById('zbGanttChart');
+        if(!el)
         {
-            var y = api.coord([0, api.value(0)])[1];
-            var start = api.coord([api.value(1), api.value(0)]);
-            var end   = api.coord([api.value(2), api.value(0)]);
-            var height = api.size([0, 1])[1] * 0.55;
-            var rect = echarts.graphic.clipRectByRect(
-                {x: start[0], y: y - height/2, width: Math.max(end[0]-start[0], 2), height: height},
-                {x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height}
-            );
-            return rect && {type: 'rect', shape: rect, style: api.style()};
-        };
-        chart.setOption({
-            tooltip: {formatter: function(p){
-                var v = p.value;
-                var fmt = function(ts){ var d = new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
-                return '<b>' + p.name + '</b><br/>' + v[3] + '<br/>' + fmt(v[1]) + ' ~ ' + fmt(v[2]);
-            }},
-            grid: {left: 120, right: 30, top: 20, bottom: 40},
-            xAxis: {type: 'time'},
-            yAxis: {type: 'category', data: names, axisLabel: {interval: 0}},
-            series: [{type: 'custom', renderItem: renderItem, encode: {x: [1,2], y: 0}, data: data}]
+            if(attempt < 20) setTimeout(function(){ window.zbInitGantt(attempt + 1); }, 100);
+            return;
+        }
+
+        var items = window.zbGanttItems || [];
+        if(!items.length){ el.innerHTML = '<div class="zb-gantt-empty">' + (window.zbGanttEmptyText || '') + '</div>'; return; }
+        if(el._chart) return;
+
+        function loadEcharts(cb)
+        {
+            if(window.echarts){ cb(); return; }
+            var src = (window.config && config.webRoot ? config.webRoot : '/') + 'js/echarts/echarts.common.min.js';
+            if(typeof $ != 'undefined' && $.getLib){ $.getLib({src: [src], root: false}, cb); }
+            else { var s = document.createElement('script'); s.src = src; s.onload = cb; document.head.appendChild(s); }
+        }
+
+        loadEcharts(function()
+        {
+            if(!window.echarts || el._chart) return;
+            var names = items.map(function(it){ return it.name; });
+            var data  = items.map(function(it, idx){
+                var s = (new Date(it.start)).getTime();
+                var e = (new Date(it.end)).getTime();
+                return {name: it.name, value: [idx, s, e, it.status], itemStyle: {color: it.color}};
+            });
+            var chart = echarts.init(el);
+            el._chart = chart;
+            var renderItem = function(params, api)
+            {
+                var y = api.coord([0, api.value(0)])[1];
+                var start = api.coord([api.value(1), api.value(0)]);
+                var end   = api.coord([api.value(2), api.value(0)]);
+                var height = api.size([0, 1])[1] * 0.55;
+                var rect = echarts.graphic.clipRectByRect(
+                    {x: start[0], y: y - height/2, width: Math.max(end[0]-start[0], 2), height: height},
+                    {x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height}
+                );
+                return rect && {type: 'rect', shape: rect, style: api.style()};
+            };
+            chart.setOption({
+                tooltip: {formatter: function(p){
+                    var v = p.value;
+                    var fmt = function(ts){ var d = new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+                    return '<b>' + p.name + '</b><br/>' + v[3] + '<br/>' + fmt(v[1]) + ' ~ ' + fmt(v[2]);
+                }},
+                grid: {left: 120, right: 30, top: 20, bottom: 40},
+                xAxis: {type: 'time'},
+                yAxis: {type: 'category', data: names, axisLabel: {interval: 0}},
+                series: [{type: 'custom', renderItem: renderItem, encode: {x: [1,2], y: 0}, data: data}]
+            });
+            window.addEventListener('resize', function(){ chart.resize(); });
         });
-        window.addEventListener('resize', function(){ chart.resize(); });
-    });
+    };
+    window.zbInitGantt(0);
+    setTimeout(function(){ window.zbInitGantt(0); }, 300);
 })();
 JS);
 

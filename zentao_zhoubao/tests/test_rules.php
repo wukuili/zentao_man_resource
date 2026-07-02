@@ -37,8 +37,8 @@ $rows = array(
 $md = zhoubaoRules::buildWecomMarkdown($rows, 2026, 27);
 check(strpos($md, '第27周') !== false,       '含周次标题');
 check(strpos($md, '已交 1') !== false,         '已交计数=1（仅 submitted）');
-check(strpos($md, '缺交 2') !== false,         '缺交计数=2（none+draft）');
-check(strpos($md, 'BB') !== false && strpos($md, '李四') !== false, '缺交名单含 BB/李四');
+check(strpos($md, '未交 2') !== false,         '未交计数=2（none+draft）');
+check(strpos($md, 'BB') !== false && strpos($md, '李四') !== false, '未交名单含 BB/李四');
 check(strpos($md, 'AA') !== false,             '已交摘要含 AA');
 
 echo $fail === 0 ? "\nALL PASSED\n" : "\n$fail FAILED\n";

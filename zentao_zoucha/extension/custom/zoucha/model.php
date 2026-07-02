@@ -30,12 +30,12 @@ class zouchaModel extends model
         $enabledRules = isset($this->config->zoucha->rules)        ? $this->config->zoucha->rules              : array('noTask', 'stale', 'overdue', 'noExecution', 'longTask');
         $today        = date('Y-m-d');
 
-        /* ── 2. 取在研项目（type=project，未删除，非关闭） ── */
+        /* ── 2. 取在研项目（type=project，未删除，仅进行中——挂起/未开始/关闭均不纳入） ── */
         $projects = $this->dao->select('id, name, PM, status, path')
             ->from(TABLE_PROJECT)
             ->where('type')->eq('project')
             ->andWhere('deleted')->eq('0')
-            ->andWhere('status')->ne('closed')
+            ->andWhere('status')->eq('doing')
             ->fetchAll('id');
 
         if(empty($projects)) return array();

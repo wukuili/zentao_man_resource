@@ -32,6 +32,7 @@ $curWeek  = str_replace('-', '_', $weekStart);
 $prevURL = helper::createLink('zhoubao', 'browse', "week={$prevWeek}&pm={$pmParam}&fill={$fillParam}&risk={$riskParam}");
 $curURL  = helper::createLink('zhoubao', 'browse', "week=&pm={$pmParam}&fill={$fillParam}&risk={$riskParam}");
 $nextURL = helper::createLink('zhoubao', 'browse', "week={$nextWeek}&pm={$pmParam}&fill={$fillParam}&risk={$riskParam}");
+$exportURL = helper::createLink('zhoubao', 'export', "type=board&week={$curWeek}&id=0&risk={$riskParam}") . '?_single=1';
 
 /* PM 下拉：按当前行集合去重（仅列出本周活跃项目里出现过的 PM），展示真实姓名、值仍为账号 */
 $pmOptions = array();
@@ -77,7 +78,7 @@ $filterHTML .= '</select>';
 
 $filterHTML .= '<button type="button" class="btn btn-primary btn-sm" onclick="zbSubmitFilter()" style="margin-left:8px">筛选</button>';
 $filterHTML .= '<button type="button" class="btn btn-default btn-sm" onclick="zbResetFilter()">重置</button>';
-$filterHTML .= '<a class="btn btn-default btn-sm" href="' . helper::createLink('zhoubao', 'export', "type=board&week={$curWeek}&risk={$riskParam}") . '" style="margin-left:8px">' . htmlspecialchars($lang->zhoubao->export) . '</a>';
+$filterHTML .= '<a class="btn btn-default btn-sm" href="' . $exportURL . '" target="_blank" download style="margin-left:8px">' . htmlspecialchars($lang->zhoubao->export) . '</a>';
 if(common::hasPriv('zhoubao', 'manage'))
 {
     $filterHTML .= '<a class="btn btn-primary btn-sm" href="javascript:;" id="btnPushNow" data-url="' . helper::createLink('zhoubao', 'pushNow', "week={$curWeek}") . '" style="margin-left:8px">' . htmlspecialchars($lang->zhoubao->pushNow) . '</a>';

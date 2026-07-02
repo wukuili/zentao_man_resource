@@ -235,7 +235,7 @@ $lang->zhoubao->doneCount   = '本周完成';
 $lang->zhoubao->overdueCount= '逾期任务';
 $lang->zhoubao->actions     = '操作';
 
-$lang->zhoubao->statusList  = array('none' => '缺交', 'draft' => '草稿', 'submitted' => '已交');
+$lang->zhoubao->statusList  = array('none' => '未交', 'draft' => '草稿', 'submitted' => '已交');
 
 $lang->zhoubao->doneTasks   = '本周完成任务';
 $lang->zhoubao->undoneTasks = '本周未完成/逾期任务';
@@ -481,7 +481,7 @@ git commit -m "feat(zhoubao): classifyTasks 任务分类规则库 + 单测"
 - Consumes: `zhoubaoRules`（Task 2）。
 - Produces: `zhoubaoRules::buildWecomMarkdown(array $rows, int $year, int $week): string`
   `rows` 每项：`['project'=>string,'pm'=>string,'status'=>'none'|'draft'|'submitted','doneCount'=>int,'overdueCount'=>int]`。
-  返回含标题、已交/缺交统计、缺交名单、已交摘要的 markdown 字符串。
+  返回含标题、已交/未交统计、未交名单、已交摘要的 markdown 字符串。
 
 - [ ] **Step 1: 追加失败测试到 tests/test_rules.php（在 exit 前）**
 
@@ -494,8 +494,8 @@ $rows = array(
 $md = zhoubaoRules::buildWecomMarkdown($rows, 2026, 27);
 check(strpos($md, '第27周') !== false,       '含周次标题');
 check(strpos($md, '已交 1') !== false,         '已交计数=1（仅 submitted）');
-check(strpos($md, '缺交 2') !== false,         '缺交计数=2（none+draft）');
-check(strpos($md, 'BB') !== false && strpos($md, '李四') !== false, '缺交名单含 BB/李四');
+check(strpos($md, '未交 2') !== false,         '未交计数=2（none+draft）');
+check(strpos($md, 'BB') !== false && strpos($md, '李四') !== false, '未交名单含 BB/李四');
 check(strpos($md, 'AA') !== false,             '已交摘要含 AA');
 ```
 
@@ -507,7 +507,7 @@ Expected: FAIL —— `Call to undefined method zhoubaoRules::buildWecomMarkdown
 - [ ] **Step 3: 在 zhoubaoRules 内实现 buildWecomMarkdown**
 
 ```php
-    /* 组装企微群机器人 markdown 文本。已交=submitted；缺交=none+draft */
+    /* 组装企微群机器人 markdown 文本。已交=submitted；未交=none+draft */
     public static function buildWecomMarkdown(array $rows, $year, $week)
     {
         $submitted = array(); $missing = array();
@@ -519,13 +519,13 @@ Expected: FAIL —— `Call to undefined method zhoubaoRules::buildWecomMarkdown
 
         $lines = array();
         $lines[] = "**【项目周报提醒 · 第{$week}周】**";
-        $lines[] = "✅ 已交 " . count($submitted) . " / ❌ 缺交 " . count($missing);
+        $lines[] = "✅ 已交 " . count($submitted) . " / ❌ 未交 " . count($missing);
 
         if(!empty($missing))
         {
             $names = array();
             foreach($missing as $r) $names[] = "{$r['project']}（{$r['pm']}）";
-            $lines[] = "> 缺交：" . implode('、', $names);
+            $lines[] = "> 未交：" . implode('、', $names);
         }
         if(!empty($submitted))
         {
@@ -713,7 +713,7 @@ panel(
 - [ ] **Step 3: 实例验证（人工）**
 
 装入实例、清缓存后进入 `zhoubao-browse`：
-预期：列表列出所有进行中项目，每行显示 PM、填报状态（缺交/草稿/已交）、本周完成数、逾期数；有周报的项目"操作"列为"查看"，否则"写周报"。改 URL `?pm=<某账号>` 与 `?fill=submitted` 应各自过滤。
+预期：列表列出所有进行中项目，每行显示 PM、填报状态（未交/草稿/已交）、本周完成数、逾期数；有周报的项目"操作"列为"查看"，否则"写周报"。改 URL `?pm=<某账号>` 与 `?fill=submitted` 应各自过滤。
 
 - [ ] **Step 4: 提交**
 

@@ -84,7 +84,7 @@
   - **undone**：`status not in (done, closed, cancel)` 且 `deadline` 落在 `[weekStart, weekEnd]` 内但未逾期（本周应完成而未完成）。
   - 脏日期（`0000-00-00`、空）按"无 deadline"处理，不计入 overdue/undone。
 - `buildWecomMarkdown(array $summaryRows, int $year, int $week): string`
-  输入各项目填报状态与摘要行，输出企微 markdown 文本（缺交名单 + 已交摘要）。纯字符串组装，可单测。
+  输入各项目填报状态与摘要行，输出企微 markdown 文本（未交名单 + 已交摘要）。纯字符串组装，可单测。
 
 `tests/test_rules.php`：零依赖 PHP харness，覆盖 5+ 场景（正常完成、跨周边界、逾期、脏日期、无 deadline、消息组装）。
 
@@ -104,9 +104,9 @@
 
 ### 6.1 汇总看板 `zhoubao-browse`（默认页 / 提醒中心）
 
-- 顶部：周切换器（上一周/本周/下一周，用 weekStart 传参）+ 项目经理筛选 + 填报状态筛选（全部/已交/草稿/缺交）。
-- 列表（dtable）：一行一个活跃项目 —— 项目名、PM、填报状态（🟢已交/🟡草稿/🔴缺交）、本周完成任务数、逾期任务数、走查命中数、操作（写周报/查看）。
-- 顶部统计条：本周应交 N / 已交 M / 缺交 K；红黄绿高亮。
+- 顶部：周切换器（上一周/本周/下一周，用 weekStart 传参）+ 项目经理筛选 + 填报状态筛选（全部/已交/草稿/未交）。
+- 列表（dtable）：一行一个活跃项目 —— 项目名、PM、填报状态（🟢已交/🟡草稿/🔴未交）、本周完成任务数、逾期任务数、走查命中数、操作（写周报/查看）。
+- 顶部统计条：本周应交 N / 已交 M / 未交 K；红黄绿高亮。
 - 工具栏：导出（功能 2）、管理员可见"立即推送企微"按钮。
 
 ### 6.2 写/编辑周报 `zhoubao-edit&project=&week=`
@@ -135,7 +135,7 @@
   - `$config->zhoubao->pushDay` / `pushTime`：默认周五 17:00（仅文档提示，实际由 cron 决定）。
 - **推送入口**：`zhoubao-cronPush&token=xxx`，校验 token 后：
   1. 算出本周所有活跃项目的填报状态与摘要行；
-  2. `zhoubaoRules::buildWecomMarkdown()` 组装 markdown（缺交名单 + 已交摘要）；
+  2. `zhoubaoRules::buildWecomMarkdown()` 组装 markdown（未交名单 + 已交摘要）；
   3. 通过禅道自带 HTTP 工具（`snoopy`/`fsockopen`/`curl`）POST 到 webhook。
 - **触发**：禅道后台"定时任务"或系统 crontab 定时 `curl` 该 URL（部署文档写清）。手动"立即推送"按钮复用同一 model 方法。
 - 组装逻辑在 `lib/`（可单测），实际 HTTP 发送在 model（不进单测）。
