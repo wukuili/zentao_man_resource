@@ -129,7 +129,7 @@ class zhoubao extends control
             $rows = $this->zhoubao->getBoardRows($weekStart, '', '');
             $labels = $this->lang->zhoubao->statusList;
             fputcsv($out, array('项目', '项目经理', '填报状态', '本周完成', '逾期任务'));
-            foreach($rows as $r) fputcsv($out, array($this->csvSafe($r->projectName), $this->csvSafe($r->pm), zget($labels, $r->status, $r->status), $r->doneCount, $r->overdueCount));
+            foreach($rows as $r) fputcsv($out, array($this->csvSafe($r->projectName), $this->csvSafe($r->pmName), zget($labels, $r->status, $r->status), $r->doneCount, $r->overdueCount));
         }
         fclose($out);
         exit;

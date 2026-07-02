@@ -88,6 +88,7 @@ class zhoubaoModel extends model
 
         $tasksByProject = $this->getProjectTasks(array_keys($projects));
         $reportMap      = $this->getReportMap($range['year'], $range['week']);
+        $pmNames        = $this->getPmNames($projects);
 
         $rows = array();
         foreach($projects as $pid => $project)
@@ -106,6 +107,7 @@ class zhoubaoModel extends model
                 'project'      => $pid,
                 'projectName'  => $project->name,
                 'pm'           => $project->PM,
+                'pmName'       => isset($pmNames[$project->PM]) && $pmNames[$project->PM] !== '' ? $pmNames[$project->PM] : $project->PM,
                 'status'       => $status,
                 'doneCount'    => count($cls['done']),
                 'overdueCount' => count($cls['overdue']),
@@ -113,6 +115,23 @@ class zhoubaoModel extends model
             );
         }
         return $rows;
+    }
+
+    /* 取项目 PM 账号对应的真实姓名，account => realname（与 zoucha 同款查询） */
+    public function getPmNames($projects)
+    {
+        $pmAccounts = array();
+        foreach($projects as $project) if(!empty($project->PM)) $pmAccounts[$project->PM] = $project->PM;
+        if(empty($pmAccounts)) return array();
+
+        $users = $this->dao->select('account, realname')
+            ->from(TABLE_USER)
+            ->where('account')->in(array_values($pmAccounts))
+            ->fetchAll('account');
+
+        $pmNames = array();
+        foreach($users as $u) $pmNames[$u->account] = $u->realname;
+        return $pmNames;
     }
 
     /* 本周消耗工时：zt_effort.date 落在本周的 consumed 之和 */

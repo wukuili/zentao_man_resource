@@ -30,9 +30,9 @@ $prevURL = helper::createLink('zhoubao', 'browse', "week={$prevWeek}&pm={$pmPara
 $curURL  = helper::createLink('zhoubao', 'browse', "week=&pm={$pmParam}&fill={$fillParam}");
 $nextURL = helper::createLink('zhoubao', 'browse', "week={$nextWeek}&pm={$pmParam}&fill={$fillParam}");
 
-/* PM 下拉：按当前行集合去重（仅列出本周活跃项目里出现过的 PM，与 zoucha 的 PM 筛选风格一致） */
+/* PM 下拉：按当前行集合去重（仅列出本周活跃项目里出现过的 PM），展示真实姓名、值仍为账号 */
 $pmOptions = array();
-foreach($rows as $r) if($r->pm !== '') $pmOptions[$r->pm] = $r->pm;
+foreach($rows as $r) if($r->pm !== '') $pmOptions[$r->pm] = ($r->pmName !== '' ? $r->pmName : $r->pm);
 
 /* ── 筛选栏 ── */
 $filterHTML  = '<div class="zb-filter-bar">';
@@ -45,10 +45,10 @@ $filterHTML .= '</span>';
 $filterHTML .= '<label style="margin-left:12px">' . htmlspecialchars($lang->zhoubao->pm) . '</label>';
 $filterHTML .= '<select id="zbFilterPM" class="form-control" style="max-width:160px">';
 $filterHTML .= '<option value="all"' . ($pm === '' || $pm === 'all' ? ' selected' : '') . '>全部</option>';
-foreach($pmOptions as $acc)
+foreach($pmOptions as $acc => $name)
 {
     $sel = ($pm === $acc) ? ' selected' : '';
-    $filterHTML .= '<option value="' . htmlspecialchars($acc) . '"' . $sel . '>' . htmlspecialchars($acc) . '</option>';
+    $filterHTML .= '<option value="' . htmlspecialchars($acc) . '"' . $sel . '>' . htmlspecialchars($name) . '</option>';
 }
 $filterHTML .= '</select>';
 
@@ -110,7 +110,7 @@ else
 
         $tableHTML .= '<tr>';
         $tableHTML .= '<td>' . $nameCell . '</td>';
-        $tableHTML .= '<td class="td-center">' . htmlspecialchars((string)$r->pm) . '</td>';
+        $tableHTML .= '<td class="td-center">' . htmlspecialchars((string)$r->pmName) . '</td>';
         $tableHTML .= '<td class="td-center"><span class="' . $statusClass . '">' . htmlspecialchars((string)$statusLabel) . '</span></td>';
         $tableHTML .= '<td class="td-center">' . (int)$r->doneCount . '</td>';
         $tableHTML .= '<td class="td-center' . ($r->overdueCount > 0 ? ' zb-num-danger' : '') . '">' . (int)$r->overdueCount . '</td>';
