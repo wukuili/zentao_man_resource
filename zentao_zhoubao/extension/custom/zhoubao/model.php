@@ -141,6 +141,9 @@ class zhoubaoModel extends model
                 'doneCount'    => count($cls['done']),
                 'overdueCount' => count($cls['overdue']),
                 'reportID'     => $report ? $report->id : 0,
+                'nextPlan'     => $report ? $report->nextPlan : '',
+                'risk'         => $report ? $report->risk : '',
+                'summary'      => $report ? $report->summary : '',
             );
         }
         return $rows;

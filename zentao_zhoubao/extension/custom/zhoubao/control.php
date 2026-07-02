@@ -146,8 +146,8 @@ class zhoubao extends control
             $weekStart = $this->zhoubao->resolveWeekStart($week);
             $rows = $this->zhoubao->getBoardRows($weekStart, '', '', $risk);
             $labels = $this->lang->zhoubao->statusList;
-            fputcsv($out, array('项目', '项目经理', '填报状态', '是否有风险', '本周完成', '逾期任务'));
-            foreach($rows as $r) fputcsv($out, array($this->csvSafe($r->projectName), $this->csvSafe($r->pmName), zget($labels, $r->status, $r->status), zget($hasRiskList, $r->hasRisk, $r->hasRisk), $r->doneCount, $r->overdueCount));
+            fputcsv($out, array('项目', '项目经理', '填报状态', '是否有风险', '本周完成', '逾期任务', '下周计划', '风险', '本周总结'));
+            foreach($rows as $r) fputcsv($out, array($this->csvSafe($r->projectName), $this->csvSafe($r->pmName), zget($labels, $r->status, $r->status), zget($hasRiskList, $r->hasRisk, $r->hasRisk), $r->doneCount, $r->overdueCount, $this->csvSafe($r->nextPlan), $this->csvSafe($r->risk), $this->csvSafe($r->summary)));
         }
         fclose($out);
         exit;
