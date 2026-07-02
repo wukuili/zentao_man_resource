@@ -121,7 +121,7 @@ class zhoubao extends control
             $r = $this->dao->select('*')->from('zt_zhoubao')->where('id')->eq((int)$id)->fetch();
             $p = $r ? $this->dao->select('name')->from(TABLE_PROJECT)->where('id')->eq($r->project)->fetch('name') : '';
             fputcsv($out, array('项目', '周次', '下周计划', '风险', '本周小结'));
-            if($r) fputcsv($out, array($p, '第' . $r->week . '周', $this->csvSafe($r->nextPlan), $this->csvSafe($r->risk), $this->csvSafe($r->summary)));
+            if($r) fputcsv($out, array($this->csvSafe($p), '第' . $r->week . '周', $this->csvSafe($r->nextPlan), $this->csvSafe($r->risk), $this->csvSafe($r->summary)));
         }
         else
         {
@@ -129,7 +129,7 @@ class zhoubao extends control
             $rows = $this->zhoubao->getBoardRows($weekStart, '', '');
             $labels = $this->lang->zhoubao->statusList;
             fputcsv($out, array('项目', '项目经理', '填报状态', '本周完成', '逾期任务'));
-            foreach($rows as $r) fputcsv($out, array($r->projectName, $r->pm, zget($labels, $r->status, $r->status), $r->doneCount, $r->overdueCount));
+            foreach($rows as $r) fputcsv($out, array($this->csvSafe($r->projectName), $this->csvSafe($r->pm), zget($labels, $r->status, $r->status), $r->doneCount, $r->overdueCount));
         }
         fclose($out);
         exit;
