@@ -7,6 +7,8 @@
 .zb-filter-bar select.form-control{display:inline-block;width:auto;max-width:160px;height:30px}
 .zb-table-wrap{overflow-x:auto}
 .zb-view-actions{margin-bottom:12px}
+.zb-prev-plan{background:#f7f9fc;border:1px solid #e3e8ee;border-radius:6px;padding:10px 14px;margin-bottom:16px}
+.zb-prev-plan h3{margin:0 0 6px 0 !important}
 .zb-stat-cards{display:flex;gap:12px;margin:8px 0}
 .zb-stat-cards span{padding:6px 12px;background:#f2f5fa;border-radius:6px;font-weight:600}
 .zb-table{width:100%;border-collapse:collapse;margin-bottom:16px}

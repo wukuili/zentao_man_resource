@@ -60,6 +60,7 @@ class zhoubao extends control
         $this->view->weekStart   = $weekStart;
         $this->view->auto        = $this->zhoubao->buildAutoData($project, $weekStart);
         $this->view->report      = $this->zhoubao->getReport($project, $weekStart);
+        $this->view->prevReport  = $this->zhoubao->getPrevReport($project, $weekStart);
         $this->display();
     }
 
@@ -97,6 +98,7 @@ class zhoubao extends control
         $this->view->projectInfo = $projectInfo;
         $this->view->auto        = $report->snapshot ? json_decode($report->snapshot, true) : array('done'=>array(),'undone'=>array(),'overdue'=>array(),'stat'=>array());
         $this->view->canEdit     = $canEdit;
+        $this->view->prevReport  = $this->zhoubao->getPrevReport($report->project, $report->weekStart);
         $this->display();
     }
 

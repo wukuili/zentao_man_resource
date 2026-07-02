@@ -81,6 +81,9 @@ if($hasZoucha)
     $pageHTML .= '</div>';
 }
 
+$prevReport = $this->view->prevReport;
+$pageHTML .= '<div class="zb-prev-plan"><h3>' . $esc($lang->zhoubao->prevPlan) . '</h3><p>' . ($prevReport ? nl2br($esc($prevReport->nextPlan)) : '上周暂无周报') . '</p></div>';
+
 $pageHTML .= '<h3>' . $esc($lang->zhoubao->summary) . '</h3><p>' . nl2br($esc($report->summary)) . '</p>';
 
 $pageHTML .= '<h3>' . $esc($lang->zhoubao->doneTasks) . '</h3>';
